@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width,minimum-scale=1,initial-scale=1">
+	<meta name="format-detection" content="telephone=no">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="author" content="vh7157@gmail.com">
+  <meta name="keywords" content="">
+  <meta name="description" content="">
+	<title>浏览器事件循环</title>
+	<link href="http://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700&subset=latin,latin-ext">
+	<link href="https://cdn.bootcss.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
+	<link rel="stylesheet" href="/blog_basic.css">
+	<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+	<div class="menu">
+		<ul class="btn-down">
+			<li class="animated fadeInDown"><a href="#" onmouseover="mopen('m1')" onmouseout="mclosetime()">菜单</a>
+				<div id="m1" onmouseover="mcancelclosetime()" onmouseout="mclosetime()" style="visibility: hidden;">
+					<a href="/">首页</a>
+					<a href="/archives">归档</a>
+				</div>
+			</li>
+		</ul>
+	</div>
+
+	<div class="header">
+		<div class="logo-title">
+			<div class="title animated fadeInDown">
+				<h1 title=""><a href="/">Vincent</a>
+				</h1>
+				<div class="description animated fadeInDown">
+					<p>♥ 专注 web 开发 ♥</p>
+				</div>
+			</div>
+		</div>
+		<ul class="social-links animated fadeInDown">
+			
+				<li>
+					<a href="https://github.com/vincent178"><i class="fa fa-github"></i><span>GitHub</span></a>
+				</li>
+			
+
+			
+				<li>
+					<a href="https://twitter.com/vincent_178"><i class="fa fa-twitter"></i><span>Twitter</span></a>
+				</li>
+			
+
+			
+				<li>
+					<a href="https://www.instagram.com/vincent178/"><i class="fa fa-instagram"></i><span>Instagram</span></a>
+				</li>
+			
+
+			
+
+			
+		</ul>
+	</div>
+
+	<div class="autopagerize_page_element">
+		<div class="content">
+		<div class="post-page">
+  <div class="post">
+    <div class="post-title">
+  <h3><a href="/2018/05/02/browser-event-loop/">浏览器事件循环</a></h3>
+  </div>
+  <div class="post-content">
+  <div class="p_part">
+    <p>
+      
+      <p>学习Javascript的过程中，事件循环是一个绕不开的话题。异步？？？，事件模型？？？任务？？？事件循环？？？这些都是什么意思？</p>
+<a id="more"></a>
+<p><a href="https://www.w3.org/TR/html5/webappapis.html#event-loops" target="_blank" rel="noopener">https://www.w3.org/TR/html5/webappapis.html#event-loops</a> 手册上是这么说的: 事件循环其实是浏览器和事件, 用户交互，渲染，网络请求等等协作的机制, 时间循环有一个或者多个任务队列，这些任务包括解析HTML，处理回调函数，网络请求等等。</p>
+<div style="display: flex; justify-content: center; align-items: center;"><br><img src="/images/???.jpeg" alt="黑人问号"><br></div>
+
+<p>在看了<a href="https://www.youtube.com/watch?v=8aGhZQkoFbQ" target="_blank" rel="noopener">Philip Roberts在JSConf上面的session</a>之后:</p>
+<blockquote>
+<p>我好像有点懂了</p>
+</blockquote>
+<h2 id="栈"><a href="#栈" class="headerlink" title="栈"></a>栈</h2><figure class="highlight javascript"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">foo</span>(<span class="params"></span>) </span>&#123;</span><br><span class="line">    <span class="built_in">console</span>.log(<span class="string">"foo"</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">bar</span>(<span class="params"></span>) </span>&#123;</span><br><span class="line">    foo();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">bar()</span><br></pre></td></tr></table></figure>
+<p><a href="http://latentflip.com/loupe/?code=ZnVuY3Rpb24gZm9vKCkgewogICAgY29uc29sZS5sb2coImZvbyIpOwp9CgpmdW5jdGlvbiBiYXIoKSB7CiAgICBmb28oKTsKfQoKYmFyKCk%3D!!!PGJ1dHRvbj5DbGljayBtZSE8L2J1dHRvbj4%3D" target="_blank" rel="noopener">可视化</a><br>js读取文件，调用函数就压到栈里面，可以执行返回就执行并且退出栈，直到所有都运行完成，很简单。<br>js在运行的过程中，更确切一些，在栈中有代码需要运行的时候，用户界面是无法响应其他事情的。</p>
+<h2 id="回调队列"><a href="#回调队列" class="headerlink" title="回调队列"></a>回调队列</h2><figure class="highlight javascript"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">foo</span>(<span class="params"></span>) </span>&#123;</span><br><span class="line">    <span class="built_in">console</span>.log(<span class="string">"foo"</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">bar</span>(<span class="params"></span>) </span>&#123;</span><br><span class="line">    setTimeout(foo(), <span class="number">1000</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">bar()</span><br></pre></td></tr></table></figure>
+<p><a href="http://latentflip.com/loupe/?code=ZnVuY3Rpb24gZm9vKCkgewogICAgY29uc29sZS5sb2coImZvbyIpOwp9CgpmdW5jdGlvbiBiYXIoKSB7CiAgICBzZXRUaW1lb3V0KGZvbygpLCAxMDAwKTsKfQoKYmFyKCk%3D!!!PGJ1dHRvbj5DbGljayBtZSE8L2J1dHRvbj4%3D" target="_blank" rel="noopener">可视化</a><br>setTimeout是浏览器实现的API，他的计时器在计算到了1000ms之后会把回调函数放入事件循环的队列里面，<strong>在栈为空的情况下</strong>，浏览器会在队列拿出第一个来压到栈里面执行。这就是为什么setTimeout不是严格的1s后执行，而是至少1s后执行。</p>
+<p>看看这个例子:<br><figure class="highlight javascript"><table><tr><td class="code"><pre><span class="line"><span class="keyword">for</span> (<span class="keyword">var</span> i = <span class="number">0</span>; i &lt; <span class="number">10</span>; i++) &#123;</span><br><span class="line">    <span class="built_in">console</span>.log(<span class="string">"Hello "</span>, i);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">for</span> (<span class="keyword">var</span> i = <span class="number">0</span>; i &lt; <span class="number">10</span>; i++) &#123;</span><br><span class="line">    setTimeout(<span class="function"><span class="params">()</span> =&gt;</span> &#123;</span><br><span class="line">        <span class="built_in">console</span>.log(<span class="string">"Hello "</span>, i);</span><br><span class="line">    &#125;, <span class="number">0</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>代码想要做的事情都是一样的，打印 Hello 1 - 9， 但实际效果是不同，第一段是持续运行，会阻止用户界面的响应，而第二段代码是把 console.log 放入队列中，这就给了浏览器在运行代码过程中响应用户的机会。 <s>这里还有一个梗，看出来了吗？</s></p>
+<p>再读一遍手册上面的定义，是不是已经理解事件循环了。</p>
+<div style="display: flex; justify-content: center; align-items: center;"><br><img src="/images/harden-eye.jpeg" alt=""><br></div>
+
+
+<h2 id="当然事情并没有那么简单"><a href="#当然事情并没有那么简单" class="headerlink" title="当然事情并没有那么简单"></a>当然事情并没有那么简单</h2><p>来看看另外一个例子<br><figure class="highlight javascript"><table><tr><td class="code"><pre><span class="line"><span class="built_in">console</span>.log(<span class="string">'script start'</span>);</span><br><span class="line"></span><br><span class="line">setTimeout(<span class="function"><span class="keyword">function</span>(<span class="params"></span>) </span>&#123;</span><br><span class="line">  <span class="built_in">console</span>.log(<span class="string">'setTimeout'</span>);</span><br><span class="line">&#125;, <span class="number">0</span>);</span><br><span class="line"></span><br><span class="line"><span class="built_in">Promise</span>.resolve().then(<span class="function"><span class="keyword">function</span>(<span class="params"></span>) </span>&#123;</span><br><span class="line">  <span class="built_in">console</span>.log(<span class="string">'promise1'</span>);</span><br><span class="line">&#125;).then(<span class="function"><span class="keyword">function</span>(<span class="params"></span>) </span>&#123;</span><br><span class="line">  <span class="built_in">console</span>.log(<span class="string">'promise2'</span>);</span><br><span class="line">&#125;);</span><br><span class="line"></span><br><span class="line"><span class="built_in">console</span>.log(<span class="string">'script end'</span>);</span><br></pre></td></tr></table></figure></p>
+<p>我第一次看到这段代码回答就是<br><figure class="highlight routeros"><table><tr><td class="code"><pre><span class="line">script start</span><br><span class="line">script end</span><br><span class="line">setTimeout</span><br><span class="line">promise1</span><br><span class="line">promise2</span><br></pre></td></tr></table></figure></p>
+<p>我这么说肯定这个答案是不对的，不对的原因是什么？</p>
+<div style="display: flex; justify-content: center; align-items: center;"><br><img src="/images/not-easy.jpeg" alt=""><br></div>
+
+<p>setTimeout 会把回调函数放入队列里面，<strong>作为Task</strong>, 而Promise也会放入队列里面，<strong>作为Microtask</strong>，Microtask比Task拥有更高优先级，在栈为空后要立即执行Microtask，而且如果队列中有Microtask，必须执行完所有的Microtask才能返回去执行Task。<br>除了Promise，MutationObserver也是Microtask。</p>
+<h2 id="Boss战"><a href="#Boss战" class="headerlink" title="Boss战"></a>Boss战</h2><div style="display: flex; justify-content: center; align-items: center;"><br><img src="/images/mieba.jpg" alt="灭霸"><br></div>
+
+
+<figure class="highlight cs"><table><tr><td class="code"><pre><span class="line"><span class="meta"># HTML</span></span><br><span class="line">&lt;div <span class="keyword">class</span>=<span class="string">"outer"</span>&gt;</span><br><span class="line">  &lt;div <span class="keyword">class</span>=<span class="string">"inner"</span>&gt;&lt;/div&gt;</span><br><span class="line">&lt;/div&gt;</span><br><span class="line"></span><br><span class="line"><span class="meta"># JS</span></span><br><span class="line"><span class="comment">// Let's get hold of those elements</span></span><br><span class="line"><span class="keyword">var</span> outer = document.querySelector(<span class="string">'.outer'</span>);</span><br><span class="line"><span class="keyword">var</span> inner = document.querySelector(<span class="string">'.inner'</span>);</span><br><span class="line"></span><br><span class="line"><span class="comment">// Let's listen for attribute changes on the</span></span><br><span class="line"><span class="comment">// outer element</span></span><br><span class="line"><span class="keyword">new</span> MutationObserver(function() &#123;</span><br><span class="line">  console.log(<span class="string">'mutate'</span>);</span><br><span class="line">&#125;).observe(outer, &#123;</span><br><span class="line">  attributes: <span class="literal">true</span></span><br><span class="line">&#125;);</span><br><span class="line"></span><br><span class="line"><span class="comment">// Here's a click listener…</span></span><br><span class="line"><span class="function">function <span class="title">onClick</span>(<span class="params"></span>) </span>&#123;</span><br><span class="line">  console.log(<span class="string">'click'</span>);</span><br><span class="line"></span><br><span class="line">  setTimeout(function() &#123;</span><br><span class="line">    console.log(<span class="string">'timeout'</span>);</span><br><span class="line">  &#125;, <span class="number">0</span>);</span><br><span class="line"></span><br><span class="line">  Promise.resolve().then(function() &#123;</span><br><span class="line">    console.log(<span class="string">'promise'</span>);</span><br><span class="line">  &#125;);</span><br><span class="line"></span><br><span class="line">  outer.setAttribute(<span class="string">'data-random'</span>, Math.random());</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// …which we'll attach to both elements</span></span><br><span class="line">inner.addEventListener(<span class="string">'click'</span>, onClick);</span><br><span class="line">outer.addEventListener(<span class="string">'click'</span>, onClick);</span><br></pre></td></tr></table></figure>
+<h2 id="测试"><a href="#测试" class="headerlink" title="测试"></a>测试</h2><style>
+    .outer {
+        background: grey;
+        height: 100px;
+        width: 100px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+        margin-bottom: 36px;
+    }
+
+    .inner {
+        background: green;
+        width: 50px;
+        height: 50px;
+    }
+
+    #result-panel {
+        outline: none;
+        resize: none;
+        font-size: 1.1em;
+    }
+</style>
+
+<div class="outer"><br>    <div class="inner"></div><br></div>
+
+<p>点击绿色的方块查看结果</p>
+<textarea id="result-panel" wrap="off" rows="8"></textarea>
+
+<p>所以你答对了吗？</p>
+<script>
+var outer = document.querySelector('.outer');
+var inner = document.querySelector('.inner');
+
+function log(msg) {
+    $('#result-panel').append(msg);
+    $('#result-panel').append("\n");
+}
+
+new MutationObserver(function() {
+  log('mutate');
+}).observe(outer, {
+  attributes: true
+});
+
+
+function onClick() {
+  log('click');
+
+  setTimeout(function() {
+    log('timeout');
+  }, 0);
+
+  Promise.resolve().then(function() {
+    log('promise');
+  });
+
+  outer.setAttribute('data-random', Math.random());
+}
+
+inner.addEventListener('click', onClick);
+outer.addEventListener('click', onClick);
+</script>
+
+
+
+
+
+
+    </p>
+  </div>
+  </div>
+  <div class="post-footer">
+  <div class="meta">
+    <div class="info">
+      <i class="fa fa-clock-o"></i><span class="date">2018-05-02</span>
+      <i class="fa fa-comment-o"></i><a href="/2018/05/02/browser-event-loop/#comments">留言</a>
+    </div>
+  </div>
+</div>
+
+
+
+<section id="comments">
+  <div id="disqus_thread">
+    <noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+  </div>
+</section>
+
+<script>
+  var disqus_shortname = 'blog-invxqhc0m5';
+  
+    var disqus_url = 'http://blog.vincent178.top/2018/05/02/browser-event-loop/';
+  
+  (function(){
+    var dsq = document.createElement('script');
+    dsq.type = 'text/javascript';
+    dsq.async = true;
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+  })();
+</script>
+
+
+  </div>
+</div>
+
+		</div>
+	</div>
+
+	<div class="footer">
+		<a target="_blank" href="http://None"><span>All content copyright CAIS © 2015 • All rights reserved.</span><span>Designed by</span></a>
+		<a href="https://www.caicai.me">CaiCai</a>
+		<div class="by_farbox">
+			<a href="https://hexo.io/docs/" target="_blank">Proudly published with Hexo!</a>
+		</div>
+	</div>
+
+	<script src="https://cdn.bootcss.com/jquery/2.1.4/jquery.min.js"></script>
+	<script src="https://cdn.bootcss.com/jquery.appear/0.3.6/jquery.appear.min.js"></script>
+	<script src="/menu.js"></script>
+</body>
+</html>
+

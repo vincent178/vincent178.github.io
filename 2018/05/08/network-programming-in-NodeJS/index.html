@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width,minimum-scale=1,initial-scale=1">
+	<meta name="format-detection" content="telephone=no">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="author" content="vh7157@gmail.com">
+  <meta name="keywords" content="">
+  <meta name="description" content="">
+	<title>Node 网络(tcp)编程笔记</title>
+	<link href="http://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700&subset=latin,latin-ext">
+	<link href="https://cdn.bootcss.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
+	<link rel="stylesheet" href="/blog_basic.css">
+	<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+	<div class="menu">
+		<ul class="btn-down">
+			<li class="animated fadeInDown"><a href="#" onmouseover="mopen('m1')" onmouseout="mclosetime()">菜单</a>
+				<div id="m1" onmouseover="mcancelclosetime()" onmouseout="mclosetime()" style="visibility: hidden;">
+					<a href="/">首页</a>
+					<a href="/archives">归档</a>
+				</div>
+			</li>
+		</ul>
+	</div>
+
+	<div class="header">
+		<div class="logo-title">
+			<div class="title animated fadeInDown">
+				<h1 title=""><a href="/">Vincent</a>
+				</h1>
+				<div class="description animated fadeInDown">
+					<p>♥ 专注 web 开发 ♥</p>
+				</div>
+			</div>
+		</div>
+		<ul class="social-links animated fadeInDown">
+			
+				<li>
+					<a href="https://github.com/vincent178"><i class="fa fa-github"></i><span>GitHub</span></a>
+				</li>
+			
+
+			
+				<li>
+					<a href="https://twitter.com/vincent_178"><i class="fa fa-twitter"></i><span>Twitter</span></a>
+				</li>
+			
+
+			
+				<li>
+					<a href="https://www.instagram.com/vincent178/"><i class="fa fa-instagram"></i><span>Instagram</span></a>
+				</li>
+			
+
+			
+
+			
+		</ul>
+	</div>
+
+	<div class="autopagerize_page_element">
+		<div class="content">
+		<div class="post-page">
+  <div class="post">
+    <div class="post-title">
+  <h3><a href="/2018/05/08/network-programming-in-NodeJS/">Node 网络(tcp)编程笔记</a></h3>
+  </div>
+  <div class="post-content">
+  <div class="p_part">
+    <p>
+      
+      <div style="display: flex; justify-content: center; align-items: center;"><br>  <img src="images/16-sockets-logical.png" alt=""><br></div>
+
+<a id="more"></a>
+<blockquote>
+<p>最近看 WebSocket，把涉及到的 tcp socket 这一层Node源代码梳理了一下</p>
+<p>有说的不对的地方，希望大家指正</p>
+</blockquote>
+<h1 id="代码"><a href="#代码" class="headerlink" title="代码"></a>代码</h1><p>Node 版本： 8.9.4<br><figure class="highlight javascript"><table><tr><td class="code"><pre><span class="line"><span class="keyword">const</span> server = <span class="keyword">new</span> net.Server(<span class="function">(<span class="params">socket</span>) =&gt;</span> &#123;</span><br><span class="line">  <span class="built_in">console</span>.log(socket);</span><br><span class="line">&#125;);</span><br><span class="line"></span><br><span class="line">server.listen(<span class="string">'1234'</span>, () =&gt; &#123;</span><br><span class="line">  <span class="built_in">console</span>.log(<span class="string">'server started at 1234'</span>);</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure></p>
+<h1 id="Socket"><a href="#Socket" class="headerlink" title="Socket"></a>Socket</h1><p>服务器 socket 是用于监听连接而不是发起连接，其生命周期通常由创建，绑定，监听，连接，关闭组成的。</p>
+<p>为了便于说明，把上面代码划分为四块：<br><figure class="highlight livecodeserver"><table><tr><td class="code"><pre><span class="line"><span class="number">1</span>) <span class="built_in">new</span> net.Server()</span><br><span class="line"><span class="number">2</span>) <span class="built_in">socket</span> =&gt; console.<span class="built_in">log</span>(<span class="built_in">socket</span>)</span><br><span class="line"><span class="number">3</span>) server.listen()</span><br><span class="line"><span class="number">4</span>) () =&gt; console.<span class="built_in">log</span>(<span class="string">'server started at 1234'</span>)</span><br></pre></td></tr></table></figure></p>
+<h1 id="服务器启动流程"><a href="#服务器启动流程" class="headerlink" title="服务器启动流程"></a>服务器启动流程</h1><p>运行代码, 我们可以通过 <code>lsof</code> 看到一个 socket 处于 LISTEN 状态, 这就是服务器 socket.</p>
+<figure class="highlight routeros"><table><tr><td class="code"><pre><span class="line">$ lsof -i tcp:1234</span><br><span class="line"></span><br><span class="line">COMMAND   PID   <span class="built_in"> USER </span>  FD  <span class="built_in"> TYPE </span>            DEVICE SIZE/OFF NODE NAME</span><br><span class="line">node    64852 i312714   14u <span class="built_in"> IPv6 </span>0xe781f0e6b2c52e5b      0t0  TCP *:search-agent (LISTEN)</span><br></pre></td></tr></table></figure>
+<p>在代码块1 我们初始化了 net.Server()，具体代码在 net.js L1176, 这里为 精简文章，只贴出了关键代码，后面都会只贴出关键代码。</p>
+<figure class="highlight javascript"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">Server</span>(<span class="params">options, connectionListener</span>) </span>&#123;</span><br><span class="line">  <span class="keyword">this</span>.on(<span class="string">'connection'</span>, connectionListener);</span><br><span class="line">  <span class="keyword">this</span>._connections = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">this</span>[async_id_symbol] = <span class="number">-1</span>;</span><br><span class="line">  <span class="keyword">this</span>._handle = <span class="literal">null</span>;</span><br><span class="line">  <span class="keyword">this</span>._usingWorkers = <span class="literal">false</span>;</span><br><span class="line">  <span class="keyword">this</span>._workers = [];</span><br><span class="line">  <span class="keyword">this</span>._unref = <span class="literal">false</span>;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">this</span>.allowHalfOpen = options.allowHalfOpen || <span class="literal">false</span>;</span><br><span class="line">  <span class="keyword">this</span>.pauseOnConnect = !!options.pauseOnConnect;</span><br><span class="line">&#125;</span><br><span class="line">util.inherits(Server, EventEmitter);</span><br></pre></td></tr></table></figure>
+<p>这里先是注册了 connection 事件监听回调connectionListener，也就是代码块2</p>
+<p>然后初始化了 _handle, _usingWorkers, _workers, _unref 等属性</p>
+<p>并且让 Server 继承 EventEmitter</p>
+<h1 id="服务器监听"><a href="#服务器监听" class="headerlink" title="服务器监听"></a>服务器监听</h1><p>按照代码运行顺序，下一步是执行代码块3，调用了server.listen， 源代码代码在 net.js L1411<br><figure class="highlight javascript"><table><tr><td class="code"><pre><span class="line">Server.prototype.listen = <span class="function"><span class="keyword">function</span>(<span class="params">...args</span>) </span>&#123;</span><br><span class="line">  <span class="keyword">var</span> normalized = normalizeArgs(args);</span><br><span class="line">  <span class="keyword">var</span> options = normalized[<span class="number">0</span>];</span><br><span class="line">  <span class="keyword">var</span> cb = normalized[<span class="number">1</span>];</span><br><span class="line"></span><br><span class="line">  <span class="keyword">var</span> backlog;</span><br><span class="line">  <span class="keyword">if</span> (<span class="keyword">typeof</span> options.port === <span class="string">'number'</span> || <span class="keyword">typeof</span> options.port === <span class="string">'string'</span>) &#123;</span><br><span class="line">    <span class="keyword">if</span> (!isLegalPort(options.port)) &#123;</span><br><span class="line">      <span class="keyword">throw</span> <span class="keyword">new</span> ERR_SOCKET_BAD_PORT(options.port);</span><br><span class="line">    &#125;</span><br><span class="line">    backlog = options.backlog || backlogFromArgs;</span><br><span class="line">    <span class="comment">// start TCP server listening on host:port</span></span><br><span class="line">    <span class="keyword">if</span> (options.host) &#123;</span><br><span class="line">      lookupAndListen(<span class="keyword">this</span>, options.port | <span class="number">0</span>, options.host, backlog,</span><br><span class="line">                      options.exclusive);</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123; <span class="comment">// Undefined host, listens on unspecified address</span></span><br><span class="line">      <span class="comment">// Default addressType 4 will be used to search for master server</span></span><br><span class="line">      listenInCluster(<span class="keyword">this</span>, <span class="literal">null</span>, options.port | <span class="number">0</span>, <span class="number">4</span>,</span><br><span class="line">                      backlog, <span class="literal">undefined</span>, options.exclusive);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">this</span>;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure></p>
+<p>省略中间代码追述，调用了 setupListenHandle<br><figure class="highlight javascript"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">setupListenHandle</span>(<span class="params">address, port, addressType, backlog, fd</span>) </span>&#123;</span><br><span class="line">  rval = createServerHandle(address, port, addressType, fd);</span><br><span class="line">  <span class="keyword">this</span>._handle = rval;</span><br><span class="line">  <span class="keyword">this</span>[async_id_symbol] = getNewAsyncId(<span class="keyword">this</span>._handle);</span><br><span class="line">  <span class="keyword">this</span>._handle.onconnection = onconnection;</span><br><span class="line">  <span class="keyword">this</span>._handle.owner = <span class="keyword">this</span>;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">this</span>._handle.listen(backlog || <span class="number">511</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>关键代码第一步是 createServerHandle, 源代码如下<br><figure class="highlight javascript"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">createServerHandle</span>(<span class="params">address, port, addressType, fd</span>) </span>&#123;</span><br><span class="line">  handle = <span class="keyword">new</span> TCP(TCPConstants.SERVER);</span><br><span class="line">  isTCP = <span class="literal">true</span>;</span><br><span class="line">  err = handle.bind(address, port);</span><br><span class="line">  <span class="keyword">return</span> handle;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>重点来了:</p>
+<p><code>TCP</code> 是从 <code>tcp_wrap</code> 模块中引入的，<code>tcp_wrap</code> 是一个C++写的Node模块, TCPWrap 的继承链是 TCPWrap &lt; ConnectionWrap &lt; LibuvStreamWrap &lt; HandleWrap, StreamBase &lt; HandleWrap</p>
+<p>在 tcp_wrap 的 Initialize 中定义了 TCP 的 open, bind, listen 等方法</p>
+<p><code>createServerHandle</code> 中的 new TCP() 是调用 tcp_wrap TCPWrap::New, 最后会返回一个 TCPWrap 的实例, 这里主要是初始化了 libuv 中 <code>uv_handle_t</code></p>
+<p><code>handle.bind()</code> 调用 TCPWrap::Bind, 这里调用了 libuv 中 uv__tcp_bind 这里给之前初始化的 handle 设置了 socket, 并且绑定了host，port等信息</p>
+<p>这时候在js中访问 <code>handle.fd</code> 就会返回真实的文件描述符，应该与 <code>lsof</code> 中看到的 <code>FD</code> 一致的</p>
+<p>回到 <code>setupListenHandle</code> 中</p>
+<p><code>handle.onconnection = onconnection</code> 这个稍后解释</p>
+<p><code>handle.listen()</code> 调用了 TCPWrap::Listen, 这里调用了 libuv 中的 uv_listen(uv_tcp_listen)，最终调用系统的 <code>listen</code> 方法, 并且注册了 <code>uv__server_io</code> 回调</p>
+<p>以上完成了Socket 的创建，绑定和监听。</p>
+<h1 id="服务器连接"><a href="#服务器连接" class="headerlink" title="服务器连接"></a>服务器连接</h1><p>服务器接收连接之后就会触发代码块2，在代码块2中就可以拿到连接socket，从中可以读取数据或者写入数据。</p>
+<p>在 new net.Server() 时，这个回调作为 connection 事件绑定到 server 上。</p>
+<p>在创建服务器socket的时候，<code>this._handle.onconnection = onconnection</code> 这个onconnection 就会最终 emit connection 事件。<br><figure class="highlight javascript"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">onconnection</span>(<span class="params">err, clientHandle</span>) </span>&#123;</span><br><span class="line">  <span class="keyword">var</span> handle = <span class="keyword">this</span>;</span><br><span class="line">  <span class="keyword">var</span> self = handle.owner;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">var</span> socket = <span class="keyword">new</span> Socket(&#123;</span><br><span class="line">    handle: clientHandle,</span><br><span class="line">    allowHalfOpen: self.allowHalfOpen,</span><br><span class="line">    pauseOnCreate: self.pauseOnConnect</span><br><span class="line">  &#125;);</span><br><span class="line">  socket.readable = socket.writable = <span class="literal">true</span>;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">  self._connections++;</span><br><span class="line">  socket.server = self;</span><br><span class="line">  socket._server = self;</span><br><span class="line">  self.emit(<span class="string">'connection'</span>, socket);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>回到调用 uv_listen 的时候的代码<br><figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">int</span> err = uv_listen(<span class="keyword">reinterpret_cast</span>&lt;<span class="keyword">uv_stream_t</span>*&gt;(&amp;wrap-&gt;handle_),</span><br><span class="line">                    backlog,</span><br><span class="line">                    OnConnection);</span><br></pre></td></tr></table></figure></p>
+<p>这里的 OnConnection 其实是 ConnectionWrap&lt;WrapType, UVType&gt;::OnConnection 这个方法，这个方法里面会调用 js 的 <code>onconnection</code> 回调。</p>
+<p>OnConnection 这个方法里面 生成了新的 socket 并且赋值给了 argv 最终传递给了 <code>onconnection</code></p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> WrapType, <span class="keyword">typename</span> UVType&gt;</span><br><span class="line"><span class="keyword">void</span> ConnectionWrap&lt;WrapType, UVType&gt;::OnConnection(<span class="keyword">uv_stream_t</span>* handle,</span><br><span class="line">                                                    <span class="keyword">int</span> status) &#123;</span><br><span class="line">  ...</span><br><span class="line">  ...</span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> (status == <span class="number">0</span>) &#123;</span><br><span class="line">    <span class="comment">// Instantiate the client javascript object and handle.</span></span><br><span class="line">    Local&lt;Object&gt; client_obj = WrapType::Instantiate(env,</span><br><span class="line">                                                     wrap_data,</span><br><span class="line">                                                     WrapType::SOCKET);</span><br><span class="line"></span><br><span class="line">    WrapType* wrap;</span><br><span class="line">    ASSIGN_OR_RETURN_UNWRAP(&amp;wrap, client_obj);</span><br><span class="line">    <span class="keyword">uv_stream_t</span>* client_handle =</span><br><span class="line">        <span class="keyword">reinterpret_cast</span>&lt;<span class="keyword">uv_stream_t</span>*&gt;(&amp;wrap-&gt;handle_);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (uv_accept(handle, client_handle))</span><br><span class="line">      <span class="keyword">return</span>;</span><br><span class="line"></span><br><span class="line">    argv[<span class="number">1</span>] = client_obj;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="comment">// connection_string 就是 "onconnection"</span></span><br><span class="line">  wrap_data-&gt;MakeCallback(env-&gt;onconnection_string(), arraysize(argv), argv);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>到这里基本说明了Node在连接时候的代码逻辑。后面也会继续整理一下关于socket close的代码。</p>
+
+    </p>
+  </div>
+  </div>
+  <div class="post-footer">
+  <div class="meta">
+    <div class="info">
+      <i class="fa fa-clock-o"></i><span class="date">2018-05-08</span>
+      <i class="fa fa-comment-o"></i><a href="/2018/05/08/network-programming-in-NodeJS/#comments">留言</a>
+    </div>
+  </div>
+</div>
+
+
+
+<section id="comments">
+  <div id="disqus_thread">
+    <noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+  </div>
+</section>
+
+<script>
+  var disqus_shortname = 'blog-invxqhc0m5';
+  
+    var disqus_url = 'http://blog.vincent178.top/2018/05/08/network-programming-in-NodeJS/';
+  
+  (function(){
+    var dsq = document.createElement('script');
+    dsq.type = 'text/javascript';
+    dsq.async = true;
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+  })();
+</script>
+
+
+  </div>
+</div>
+
+		</div>
+	</div>
+
+	<div class="footer">
+		<a target="_blank" href="http://None"><span>All content copyright CAIS © 2015 • All rights reserved.</span><span>Designed by</span></a>
+		<a href="https://www.caicai.me">CaiCai</a>
+		<div class="by_farbox">
+			<a href="https://hexo.io/docs/" target="_blank">Proudly published with Hexo!</a>
+		</div>
+	</div>
+
+	<script src="https://cdn.bootcss.com/jquery/2.1.4/jquery.min.js"></script>
+	<script src="https://cdn.bootcss.com/jquery.appear/0.3.6/jquery.appear.min.js"></script>
+	<script src="/menu.js"></script>
+</body>
+</html>
+
