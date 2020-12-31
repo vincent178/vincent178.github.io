@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  
+    <title>浅谈 Go 语言的错误 :: Keep Curiosity — 保持好奇心</title>
+  
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<meta name="description" content="Go 一直把错误作为一个普通的值，一个包含一段文本信息的类型为错误的值，而这在 1.13 版本之后发生了改变。
+ 1.13 版本之前 Go 中任意类型只要实现了 error 接口的都可以称为错误。
+type error interface { Error() string } 程序中通常会直接用 errors.New 生成错误，调用者拿到错误的时候可以直接用 == 做错误判断：
+var ErrNotFound = errors.New(&amp;#34;not found&amp;#34;) if err == ErrNotFound { // 错误处理 } 当简单的错误不能满足业务要求时，也会自己定义 struct 来实现 error 接口，然后需要通过类型断言 (type assertion or type switch) 做错误判断：
+type NotFoundError struct { Name string } func (e *NotFoundError) Error() string { return e.Name &#43; &amp;#34;: not found&amp;#34; } if e, ok := err." />
+<meta name="keywords" content="golang kubernetes blog 博客" />
+<meta name="robots" content="noodp" />
+<link rel="canonical" href="/posts/go/error/" />
+
+
+<script type="application/javascript">
+var doNotTrack = false;
+if (!doNotTrack) {
+	(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+	(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+	m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+	})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+	ga('create', 'UA-167990863-1', 'auto');
+	
+	ga('send', 'pageview');
+}
+</script>
+
+
+
+<link rel="stylesheet" href="/assets/style.css">
+
+
+
+
+
+
+<link rel="apple-touch-icon-precomposed" sizes="144x144" href="/img/apple-touch-icon-144-precomposed.png">
+
+  <link rel="shortcut icon" href="/img/favicon/orange.png">
+
+
+
+<meta name="twitter:card" content="summary" />
+
+<meta name="twitter:creator" content="" />
+
+
+<meta property="og:locale" content="zh" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="浅谈 Go 语言的错误 :: Keep Curiosity">
+<meta property="og:description" content="Go 一直把错误作为一个普通的值，一个包含一段文本信息的类型为错误的值，而这在 1.13 版本之后发生了改变。
+ 1.13 版本之前 Go 中任意类型只要实现了 error 接口的都可以称为错误。
+type error interface { Error() string } 程序中通常会直接用 errors.New 生成错误，调用者拿到错误的时候可以直接用 == 做错误判断：
+var ErrNotFound = errors.New(&amp;#34;not found&amp;#34;) if err == ErrNotFound { // 错误处理 } 当简单的错误不能满足业务要求时，也会自己定义 struct 来实现 error 接口，然后需要通过类型断言 (type assertion or type switch) 做错误判断：
+type NotFoundError struct { Name string } func (e *NotFoundError) Error() string { return e.Name &#43; &amp;#34;: not found&amp;#34; } if e, ok := err." />
+<meta property="og:url" content="/posts/go/error/" />
+<meta property="og:site_name" content="浅谈 Go 语言的错误" />
+
+  
+    <meta property="og:image" content="/img/favicon/orange.png">
+  
+
+<meta property="og:image:width" content="2048">
+<meta property="og:image:height" content="1024">
+
+
+  <meta property="article:published_time" content="2020-02-01 00:00:00 &#43;0800 &#43;0800" />
+
+
+
+
+
+
+
+
+
+
+
+
+</head>
+<body class="">
+
+
+<div class="container headings--one-size">
+
+  <header class="header">
+  <div class="header__inner">
+    <div class="header__logo">
+      <a href="/">
+  <div class="logo">
+    保持好奇心
+  </div>
+</a>
+
+    </div>
+    <div class="menu-trigger">menu</div>
+  </div>
+  
+    <nav class="menu">
+  <ul class="menu__inner menu__inner--desktop">
+    
+      
+        
+          <li><a href="/about">About</a></li>
+        
+      
+        
+          <li><a href="/archive">Archive</a></li>
+        
+      
+      
+    
+
+    
+  </ul>
+
+  <ul class="menu__inner menu__inner--mobile">
+    
+      
+        <li><a href="/about">About</a></li>
+      
+    
+      
+        <li><a href="/archive">Archive</a></li>
+      
+    
+    
+  </ul>
+</nav>
+
+  
+</header>
+
+
+  <div class="content">
+    
+<div class="post">
+  <h1 class="post-title">
+    <a href="/posts/go/error/">浅谈 Go 语言的错误</a></h1>
+  <div class="post-meta">
+      
+    <span class="post-date">
+      2020-02-01
+    </span>
+    
+    
+  </div>
+
+  
+
+  
+
+  <div class="post-content"><div>
+        <blockquote>
+<p>Go 一直把错误作为一个普通的值，一个包含一段文本信息的类型为错误的值，而这在 1.13 版本之后发生了改变。</p>
+</blockquote>
+<h2 id="113-版本之前">1.13 版本之前<a href="#113-版本之前" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h2>
+<p>Go 中任意类型只要实现了 <code>error</code> 接口的都可以称为错误。</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#66d9ef">type</span> <span style="color:#66d9ef">error</span> <span style="color:#66d9ef">interface</span> {
+	<span style="color:#a6e22e">Error</span>() <span style="color:#66d9ef">string</span>
+}
+</code></pre></div><p>程序中通常会直接用 <code>errors.New</code> 生成错误，调用者拿到错误的时候可以直接用 <code>==</code> 做错误判断：</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#66d9ef">var</span> <span style="color:#a6e22e">ErrNotFound</span> = <span style="color:#a6e22e">errors</span>.<span style="color:#a6e22e">New</span>(<span style="color:#e6db74">&#34;not found&#34;</span>)
+
+<span style="color:#66d9ef">if</span> <span style="color:#a6e22e">err</span> <span style="color:#f92672">==</span> <span style="color:#a6e22e">ErrNotFound</span> {
+	<span style="color:#75715e">// 错误处理
+</span><span style="color:#75715e"></span>}
+</code></pre></div><p>当简单的错误不能满足业务要求时，也会自己定义 <code>struct</code> 来实现 <code>error</code> 接口，然后需要通过类型断言 (type assertion or type switch) 做错误判断：</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">NotFoundError</span> <span style="color:#66d9ef">struct</span> {
+    <span style="color:#a6e22e">Name</span> <span style="color:#66d9ef">string</span>
+}
+
+<span style="color:#66d9ef">func</span> (<span style="color:#a6e22e">e</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">NotFoundError</span>) <span style="color:#a6e22e">Error</span>() <span style="color:#66d9ef">string</span> { <span style="color:#66d9ef">return</span> <span style="color:#a6e22e">e</span>.<span style="color:#a6e22e">Name</span> <span style="color:#f92672">+</span> <span style="color:#e6db74">&#34;: not found&#34;</span> }
+
+<span style="color:#66d9ef">if</span> <span style="color:#a6e22e">e</span>, <span style="color:#a6e22e">ok</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">err</span>.(<span style="color:#f92672">*</span><span style="color:#a6e22e">NotFoundError</span>); <span style="color:#a6e22e">ok</span> {
+	<span style="color:#75715e">// 错误处理
+</span><span style="color:#75715e"></span>}
+</code></pre></div><p>当错误要传递额外信息时，通常是用 <code>fmt.Errorf</code> 来包含原来的错误：</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#66d9ef">if</span> <span style="color:#a6e22e">err</span> <span style="color:#f92672">!=</span> <span style="color:#66d9ef">nil</span> {
+	<span style="color:#66d9ef">return</span> <span style="color:#a6e22e">fmt</span>.<span style="color:#a6e22e">Errorf</span>(<span style="color:#e6db74">&#34;登陆失败: %v&#34;</span>, <span style="color:#a6e22e">err</span>)
+}
+</code></pre></div><p>但上述方法只能包含原有错误中的文本信息 (message)，失去了原有错误的其他信息，包括类型以及<code>struct</code> 其他自定义的字段。调用者也失去了处理原有错误的机会，只能基于文本做分析处理。</p>
+<h2 id="新的-api">新的 API<a href="#新的-api" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h2>
+<p>问题出在了 <code>fmt.Errorf</code> 返回的时候失去了内部错误的信息，保留的文本信息在简单的 debug 场景下是够用了，到复杂系统中，这样的信息是远远不够的。</p>
+<p>Go 在 1.13 版本中带来了 error wrapping，简单的说就是在错误传递的过程中，新生成的错误中可以包含完整的其他错误，就像洋葱一样的层层包裹。</p>
+<p><img src="./../images/error_wrapping.png" alt=""></p>
+<p><code>fmt.Errorf</code> 新的 <code>%w</code> 生成包裹的错误:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#a6e22e">newErr</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">fmt</span>.<span style="color:#a6e22e">Errorf</span>(<span style="color:#e6db74">&#34;access error: %w&#34;</span>, <span style="color:#a6e22e">permissionErr</span>)
+</code></pre></div><p><code>errors.Unwrap</code> 剥开一层返回内部的错误，这个方法要求包裹的错误实现 <code>Unwrap</code> 方法，用 <code>fmt.Errorf</code> 生成的错误已经实现了该方法：</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#a6e22e">permissionErr</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">errors</span>.<span style="color:#a6e22e">Unwrap</span>(<span style="color:#a6e22e">newErr</span>)
+</code></pre></div><p><code>errors.Is</code> 代替 <code>==</code> 判断错误，会调用 <code>errors.Unwrap</code> 判断错误链上任意一个错误是否与目标错误相等：</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#75715e">// 类似于 if err == ErrNotFound {
+</span><span style="color:#75715e"></span><span style="color:#66d9ef">if</span> <span style="color:#a6e22e">errors</span>.<span style="color:#a6e22e">Is</span>(<span style="color:#a6e22e">err</span>, <span style="color:#a6e22e">ErrNotFound</span>) {
+	<span style="color:#75715e">// 错误处理
+</span><span style="color:#75715e"></span>}
+</code></pre></div><p><code>errors.As</code> 代替类型推断判断错误，会调用 <code>errors.Unwrap</code> 判断错误链上任意一个错误是否与目标错误类型相同，如果相同，将错误赋值给目标类型：</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#75715e">// 类似于 if e, ok := err.(*NotFoundError); ok {
+</span><span style="color:#75715e"></span><span style="color:#66d9ef">var</span> <span style="color:#a6e22e">e</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">NotFoundError</span>
+<span style="color:#66d9ef">if</span> <span style="color:#a6e22e">errors</span>.<span style="color:#a6e22e">As</span>(<span style="color:#a6e22e">err</span>, <span style="color:#f92672">&amp;</span><span style="color:#a6e22e">e</span>) {
+	<span style="color:#75715e">// 错误处理
+</span><span style="color:#75715e"></span>}
+</code></pre></div><h2 id="扩展">扩展<a href="#扩展" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h2>
+<p>可以通过实现 <code>Is(err error) bool</code> 方法扩展 <code>errors.Is</code> 的比较逻辑，考虑下面的例子</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">Error</span> <span style="color:#66d9ef">struct</span> {
+    <span style="color:#a6e22e">Path</span> <span style="color:#66d9ef">string</span>
+    <span style="color:#a6e22e">User</span> <span style="color:#66d9ef">string</span>
+}
+
+<span style="color:#66d9ef">func</span> (<span style="color:#a6e22e">e</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">Error</span>) <span style="color:#a6e22e">Is</span>(<span style="color:#a6e22e">target</span> <span style="color:#66d9ef">error</span>) <span style="color:#66d9ef">bool</span> {
+    <span style="color:#a6e22e">t</span>, <span style="color:#a6e22e">ok</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">target</span>.(<span style="color:#f92672">*</span><span style="color:#a6e22e">Error</span>)
+    <span style="color:#66d9ef">if</span> !<span style="color:#a6e22e">ok</span> {
+        <span style="color:#66d9ef">return</span> <span style="color:#66d9ef">false</span>
+    }
+    <span style="color:#66d9ef">return</span> (<span style="color:#a6e22e">e</span>.<span style="color:#a6e22e">Path</span> <span style="color:#f92672">==</span> <span style="color:#a6e22e">t</span>.<span style="color:#a6e22e">Path</span> <span style="color:#f92672">||</span> <span style="color:#a6e22e">t</span>.<span style="color:#a6e22e">Path</span> <span style="color:#f92672">==</span> <span style="color:#e6db74">&#34;&#34;</span>) <span style="color:#f92672">&amp;&amp;</span>
+           (<span style="color:#a6e22e">e</span>.<span style="color:#a6e22e">User</span> <span style="color:#f92672">==</span> <span style="color:#a6e22e">t</span>.<span style="color:#a6e22e">User</span> <span style="color:#f92672">||</span> <span style="color:#a6e22e">t</span>.<span style="color:#a6e22e">User</span> <span style="color:#f92672">==</span> <span style="color:#e6db74">&#34;&#34;</span>)
+}
+
+<span style="color:#66d9ef">if</span> <span style="color:#a6e22e">errors</span>.<span style="color:#a6e22e">Is</span>(<span style="color:#a6e22e">err</span>, <span style="color:#f92672">&amp;</span><span style="color:#a6e22e">Error</span>{<span style="color:#a6e22e">User</span>: <span style="color:#e6db74">&#34;someuser&#34;</span>}) {
+    <span style="color:#75715e">// err&#39;s User field is &#34;someuser&#34;.
+</span><span style="color:#75715e"></span>}
+</code></pre></div><p>这样错误判断也有更强的自定义行为。<code>errors.As</code> 方法也是同样可以用 <code>As</code> 方法来扩展。</p>
+<h2 id="源码解析">源码解析<a href="#源码解析" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h2>
+<p>以下是基于 go version go1.13.1 darwin/amd64 的源代码解析</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">Unwrap</span>(<span style="color:#a6e22e">err</span> <span style="color:#66d9ef">error</span>) <span style="color:#66d9ef">error</span> {
+	<span style="color:#a6e22e">u</span>, <span style="color:#a6e22e">ok</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">err</span>.(<span style="color:#66d9ef">interface</span> {
+		<span style="color:#a6e22e">Unwrap</span>() <span style="color:#66d9ef">error</span>
+	}) <span style="color:#75715e">// 判断错误有没有实现 Unwrap 方法
+</span><span style="color:#75715e"></span>	<span style="color:#66d9ef">if</span> !<span style="color:#a6e22e">ok</span> {
+		<span style="color:#66d9ef">return</span> <span style="color:#66d9ef">nil</span> <span style="color:#75715e">// 没有实现返回 nil
+</span><span style="color:#75715e"></span>	}
+	<span style="color:#66d9ef">return</span> <span style="color:#a6e22e">u</span>.<span style="color:#a6e22e">Unwrap</span>() <span style="color:#75715e">// 调用 Unwrap 方法返回内部错误
+</span><span style="color:#75715e"></span>}
+</code></pre></div><div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">Is</span>(<span style="color:#a6e22e">err</span>, <span style="color:#a6e22e">target</span> <span style="color:#66d9ef">error</span>) <span style="color:#66d9ef">bool</span> {
+	<span style="color:#66d9ef">if</span> <span style="color:#a6e22e">target</span> <span style="color:#f92672">==</span> <span style="color:#66d9ef">nil</span> {
+		<span style="color:#66d9ef">return</span> <span style="color:#a6e22e">err</span> <span style="color:#f92672">==</span> <span style="color:#a6e22e">target</span>
+	}
+
+	<span style="color:#a6e22e">isComparable</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">reflectlite</span>.<span style="color:#a6e22e">TypeOf</span>(<span style="color:#a6e22e">target</span>).<span style="color:#a6e22e">Comparable</span>()
+	<span style="color:#66d9ef">for</span> {
+		<span style="color:#66d9ef">if</span> <span style="color:#a6e22e">isComparable</span> <span style="color:#f92672">&amp;&amp;</span> <span style="color:#a6e22e">err</span> <span style="color:#f92672">==</span> <span style="color:#a6e22e">target</span> { <span style="color:#75715e">// 如果能比较，并且 err 与 target 相等
+</span><span style="color:#75715e"></span>			<span style="color:#66d9ef">return</span> <span style="color:#66d9ef">true</span>
+		}
+		<span style="color:#66d9ef">if</span> <span style="color:#a6e22e">x</span>, <span style="color:#a6e22e">ok</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">err</span>.(<span style="color:#66d9ef">interface</span>{ <span style="color:#a6e22e">Is</span>(<span style="color:#66d9ef">error</span>) <span style="color:#66d9ef">bool</span> }); <span style="color:#a6e22e">ok</span> <span style="color:#f92672">&amp;&amp;</span> <span style="color:#a6e22e">x</span>.<span style="color:#a6e22e">Is</span>(<span style="color:#a6e22e">target</span>) { <span style="color:#75715e">// 如果实现了 Is 方法，用 Is 来比较
+</span><span style="color:#75715e"></span>			<span style="color:#66d9ef">return</span> <span style="color:#66d9ef">true</span>
+		}
+		<span style="color:#66d9ef">if</span> <span style="color:#a6e22e">err</span> = <span style="color:#a6e22e">Unwrap</span>(<span style="color:#a6e22e">err</span>); <span style="color:#a6e22e">err</span> <span style="color:#f92672">==</span> <span style="color:#66d9ef">nil</span> { <span style="color:#75715e">// Unwrap 返回内部错误
+</span><span style="color:#75715e"></span>			<span style="color:#66d9ef">return</span> <span style="color:#66d9ef">false</span>
+		}
+	}
+}
+</code></pre></div><div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">As</span>(<span style="color:#a6e22e">err</span> <span style="color:#66d9ef">error</span>, <span style="color:#a6e22e">target</span> <span style="color:#66d9ef">interface</span>{}) <span style="color:#66d9ef">bool</span> {
+	<span style="color:#66d9ef">if</span> <span style="color:#a6e22e">target</span> <span style="color:#f92672">==</span> <span style="color:#66d9ef">nil</span> { <span style="color:#75715e">// target 不能是 nil
+</span><span style="color:#75715e"></span>		panic(<span style="color:#e6db74">&#34;errors: target cannot be nil&#34;</span>)
+	}
+	<span style="color:#a6e22e">val</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">reflectlite</span>.<span style="color:#a6e22e">ValueOf</span>(<span style="color:#a6e22e">target</span>)
+	<span style="color:#a6e22e">typ</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">val</span>.<span style="color:#a6e22e">Type</span>()
+	<span style="color:#66d9ef">if</span> <span style="color:#a6e22e">typ</span>.<span style="color:#a6e22e">Kind</span>() <span style="color:#f92672">!=</span> <span style="color:#a6e22e">reflectlite</span>.<span style="color:#a6e22e">Ptr</span> <span style="color:#f92672">||</span> <span style="color:#a6e22e">val</span>.<span style="color:#a6e22e">IsNil</span>() { <span style="color:#75715e">// target 不能是个空指针
+</span><span style="color:#75715e"></span>		panic(<span style="color:#e6db74">&#34;errors: target must be a non-nil pointer&#34;</span>)
+	}
+	<span style="color:#66d9ef">if</span> <span style="color:#a6e22e">e</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">typ</span>.<span style="color:#a6e22e">Elem</span>(); <span style="color:#a6e22e">e</span>.<span style="color:#a6e22e">Kind</span>() <span style="color:#f92672">!=</span> <span style="color:#a6e22e">reflectlite</span>.<span style="color:#a6e22e">Interface</span> <span style="color:#f92672">&amp;&amp;</span> !<span style="color:#a6e22e">e</span>.<span style="color:#a6e22e">Implements</span>(<span style="color:#a6e22e">errorType</span>) { <span style="color:#75715e">// target 必须是接口或者是实现了 error 接口的 struct
+</span><span style="color:#75715e"></span>		panic(<span style="color:#e6db74">&#34;errors: *target must be interface or implement error&#34;</span>)
+	}
+	<span style="color:#a6e22e">targetType</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">typ</span>.<span style="color:#a6e22e">Elem</span>()
+	<span style="color:#66d9ef">for</span> <span style="color:#a6e22e">err</span> <span style="color:#f92672">!=</span> <span style="color:#66d9ef">nil</span> {
+		<span style="color:#66d9ef">if</span> <span style="color:#a6e22e">reflectlite</span>.<span style="color:#a6e22e">TypeOf</span>(<span style="color:#a6e22e">err</span>).<span style="color:#a6e22e">AssignableTo</span>(<span style="color:#a6e22e">targetType</span>) { <span style="color:#75715e">// https://golang.org/ref/spec#Assignability
+</span><span style="color:#75715e"></span>			<span style="color:#a6e22e">val</span>.<span style="color:#a6e22e">Elem</span>().<span style="color:#a6e22e">Set</span>(<span style="color:#a6e22e">reflectlite</span>.<span style="color:#a6e22e">ValueOf</span>(<span style="color:#a6e22e">err</span>))
+			<span style="color:#66d9ef">return</span> <span style="color:#66d9ef">true</span>
+		}
+		<span style="color:#66d9ef">if</span> <span style="color:#a6e22e">x</span>, <span style="color:#a6e22e">ok</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">err</span>.(<span style="color:#66d9ef">interface</span>{ <span style="color:#a6e22e">As</span>(<span style="color:#66d9ef">interface</span>{}) <span style="color:#66d9ef">bool</span> }); <span style="color:#a6e22e">ok</span> <span style="color:#f92672">&amp;&amp;</span> <span style="color:#a6e22e">x</span>.<span style="color:#a6e22e">As</span>(<span style="color:#a6e22e">target</span>) { <span style="color:#75715e">// 如果定义 As 方法，通过 As 方法转换
+</span><span style="color:#75715e"></span>			<span style="color:#66d9ef">return</span> <span style="color:#66d9ef">true</span>
+		}
+		<span style="color:#a6e22e">err</span> = <span style="color:#a6e22e">Unwrap</span>(<span style="color:#a6e22e">err</span>) <span style="color:#75715e">// Unwrap 返回内部错误
+</span><span style="color:#75715e"></span>	}
+	<span style="color:#66d9ef">return</span> <span style="color:#66d9ef">false</span>
+}
+</code></pre></div><h3 id="reference">Reference<a href="#reference" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h3>
+<ol>
+<li><a href="https://blog.golang.org/go1.13-errors">https://blog.golang.org/go1.13-errors</a></li>
+<li><a href="https://golang.org/ref/spec#Assignability">https://golang.org/ref/spec#Assignability</a></li>
+<li><a href="https://github.com/golang/go/wiki/ErrorValueFAQ">https://github.com/golang/go/wiki/ErrorValueFAQ</a></li>
+<li><a href="https://golang.org/doc/go1.13">https://golang.org/doc/go1.13</a></li>
+</ol>
+<p><img src="../images/wechat.bmp" alt=""></p>
+
+      </div></div>
+
+  
+  
+<div class="pagination">
+    <div class="pagination__title">
+        <span class="pagination__title-h">其他博客</span>
+        <hr />
+    </div>
+    <div class="pagination__buttons">
+        
+        <span class="button previous">
+            <a href="/posts/database/pg_bloat/">
+                <span class="button__icon">←</span>
+                <span class="button__text">深入浅出 PG 数据膨胀</span>
+            </a>
+        </span>
+        
+        
+        <span class="button next">
+            <a href="/posts/go/assembly/">
+                <span class="button__text">浅谈 Go 语言的汇编</span>
+                <span class="button__icon">→</span>
+            </a>
+        </span>
+        
+    </div>
+</div>
+
+  
+
+  
+
+</div>
+
+  </div>
+
+  
+    <footer class="footer">
+  <div class="footer__inner">
+    
+      <div class="copyright">
+        <span>© 2020 Powered by <a href="http://gohugo.io">Hugo</a></span>
+    
+        <span>:: Theme made by <a href="https://twitter.com/panr">panr</a></span>
+      </div>
+  </div>
+</footer>
+
+<script src="/assets/main.js"></script>
+<script src="/assets/prism.js"></script>
+
+
+
+
+
+  
+</div>
+
+</body>
+</html>

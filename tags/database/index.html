@@ -1,16 +1,15 @@
 <!DOCTYPE html>
 <html lang="zh">
 <head>
-	<meta name="generator" content="Hugo 0.71.1" />
   
-    <title>Keep Curiosity — 保持好奇心</title>
+    <title>database :: Keep Curiosity — 保持好奇心</title>
   
   <meta http-equiv="content-type" content="text/html; charset=utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
-<meta name="description" content="保持好奇心" />
+<meta name="description" content="" />
 <meta name="keywords" content="golang kubernetes blog 博客" />
 <meta name="robots" content="noodp" />
-<link rel="canonical" href="/" />
+<link rel="canonical" href="/tags/database/" />
 
 
 <script type="application/javascript">
@@ -48,10 +47,10 @@ if (!doNotTrack) {
 
 <meta property="og:locale" content="zh" />
 <meta property="og:type" content="website" />
-<meta property="og:title" content="Keep Curiosity">
-<meta property="og:description" content="保持好奇心" />
-<meta property="og:url" content="/" />
-<meta property="og:site_name" content="Keep Curiosity" />
+<meta property="og:title" content="database :: Keep Curiosity">
+<meta property="og:description" content="" />
+<meta property="og:url" content="/tags/database/" />
+<meta property="og:site_name" content="database" />
 
   
     <meta property="og:image" content="/img/favicon/orange.png">
@@ -64,7 +63,7 @@ if (!doNotTrack) {
 
 
 
-  <link href="/index.xml" rel="alternate" type="application/rss+xml" title="Keep Curiosity" />
+  <link href="/tags/database/index.xml" rel="alternate" type="application/rss+xml" title="Keep Curiosity" />
 
 
 
@@ -137,108 +136,8 @@ if (!doNotTrack) {
 
   
   
-    
-  
   
 
-  
-  <div class="post on-list">
-    <h1 class="post-title">
-      <a href="/posts/2020-report/">2020 年度总结</a></h1>
-    <div class="post-meta">
-      <span class="post-date">
-        2020-12-31
-      </span>
-      
-    </div>
-
-    
-
-    
-
-    <div class="post-content">
-      
-      
-      
-    </div>
-
-    
-    <div>
-      <a class="read-more button"
-        href="/posts/2020-report/">Read more →</a>
-    </div>
-    
-  </div>
-  
-  <div class="post on-list">
-    <h1 class="post-title">
-      <a href="/posts/go/unsafe/">浅谈 Go 语言的 unsafe 包</a></h1>
-    <div class="post-meta">
-      <span class="post-date">
-        2020-06-02
-      </span>
-      
-    </div>
-
-    
-
-    
-
-    <div class="post-content">
-      
-      
-      <img src="/go/unsafe.png" alt="unsafe">
-      
-      
-    </div>
-
-    
-    <div>
-      <a class="read-more button"
-        href="/posts/go/unsafe/">Read more →</a>
-    </div>
-    
-  </div>
-  
-  <div class="post on-list">
-    <h1 class="post-title">
-      <a href="/posts/go/lock-in-function/">高效用锁之巧用立即执行函数</a></h1>
-    <div class="post-meta">
-      <span class="post-date">
-        2020-04-26
-      </span>
-      
-    </div>
-
-    
-    <span class="post-tags">
-      
-      #<a href="/tags/go/">go</a>&nbsp;
-      
-    </span>
-    
-
-    
-
-    <div class="post-content">
-      
-      
-      锁在 go 的代码中很常见。并发编程中锁保护对共享内存的读取和改动，不会出现竞争（race condition）。
-type person struct { mux sync.Mutex name string // &hellip; } func (s *person) UpdateName(name string) error { s.mux.Lock() defer s.mux.Unlock() // &hellip;  s.name = name // &hellip; } 高效使用锁的一个要点就是锁变量不锁过程，也就是只锁需要在并发下获取或改变的变量。
-根据这个优化一下上面的代码，移除 defer 代码，只在变量的上下调用锁。
-func (s *person) UpdateName(name string) error { // &hellip;  s.mux.Lock() s.name = name s.mux.Unlock() // &hellip; } 但因为移除了 defer 代码块，提高了维护成本。在复杂的代码情景下，会有可能忘了调用 Unlock 或者在 Lock 和 Unlock 中间插入了不应该由锁保护的代码导致性能下降。
-那么有没有办法保留 defer 同时只保护 name 变量呢？引入一个新的立即执行函数。
-      
-      
-    </div>
-
-    
-    <div>
-      <a class="read-more button"
-        href="/posts/go/lock-in-function/">Read more →</a>
-    </div>
-    
-  </div>
   
   <div class="post on-list">
     <h1 class="post-title">
@@ -279,50 +178,9 @@ pg_ninja=# SELECT attname, format_type (atttypid, atttypmod) pg_ninja-# FROM pg_
     
   </div>
   
-  <div class="post on-list">
-    <h1 class="post-title">
-      <a href="/posts/go/error/">浅谈 Go 语言的错误</a></h1>
-    <div class="post-meta">
-      <span class="post-date">
-        2020-02-01
-      </span>
-      
-    </div>
-
-    
-
-    
-
-    <div class="post-content">
-      
-      
-      Go 一直把错误作为一个普通的值，一个包含一段文本信息的类型为错误的值，而这在 1.13 版本之后发生了改变。
-1.13 版本之前 Go 中任意类型只要实现了 error 接口的都可以称为错误。
-type error interface { Error() string } 程序中通常会直接用 errors.New 生成错误，调用者拿到错误的时候可以直接用 == 做错误判断：
-var ErrNotFound = errors.New(&quot;not found&quot;) if err == ErrNotFound { // 错误处理 } 当简单的错误不能满足业务要求时，也会自己定义 struct 来实现 error 接口，然后需要通过类型断言 (type assertion or type switch) 做错误判断：
-type NotFoundError struct { Name string } func (e *NotFoundError) Error() string { return e.Name + &quot;: not found&quot; } if e, ok := err.
-      
-      
-    </div>
-
-    
-    <div>
-      <a class="read-more button"
-        href="/posts/go/error/">Read more →</a>
-    </div>
-    
-  </div>
-  
   <div class="pagination">
   <div class="pagination__buttons">
     
-    
-      <span class="button next">
-        <a href="/page/2/">
-          <span class="button__text">Older posts</span>
-          <span class="button__icon">→</span>
-        </a>
-      </span>
     
   </div>
 </div>

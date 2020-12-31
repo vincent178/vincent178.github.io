@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  
+    <title>深入浅出 PG 数据膨胀 :: Keep Curiosity — 保持好奇心</title>
+  
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<meta name="description" content="多版本并发控制 MVCC 多版本并发控制，是数据库管理系统常用的一种并发控制，每个事务读到的数据项都是一个历史快照（snapshot）并依赖于实现的隔离级别。写操作不覆盖已有数据项，而是创建一个新的版本，直至所在操作提交时才变为可见。Postgres（以下简称PG）中的多版本，是保存在各个表中的，相比较 MySQL 是保存在全局中的。
+隐藏的版本信息 PG 各个表独立保存着多版本信息，也意味着在每条记录都有版本号。通过一些技巧可以挖掘到这些隐藏的信息。
+pg_ninja=# \d employee Table &amp;quot;public.employee&amp;quot; Column | Type | Modifiers ---------&#43;-----------------------&#43;----------- emp_id | integer | not null name | character varying(20) | dept_id | integer | Indexes: &amp;quot;employee_pkey&amp;quot; PRIMARY KEY, btree (emp_id) 在 pg_attribute 中可以看到几个隐藏的字段：
+pg_ninja=# SELECT attname, format_type (atttypid, atttypmod) pg_ninja-# FROM pg_attribute pg_ninja-# WHERE attrelid::regclass::text=&#39;employee&#39; pg_ninja-# ORDER BY attnum; attname | format_type ----------&#43;----------------------- tableoid | oid cmax | cid xmax | xid cmin | cid xmin | xid ctid | tid emp_id | integer name | character varying(20) dept_id | integer (9 rows) 通过 SELECT 返回隐藏字段的值：" />
+<meta name="keywords" content="golang kubernetes blog 博客" />
+<meta name="robots" content="noodp" />
+<link rel="canonical" href="/posts/database/pg_bloat/" />
+
+
+<script type="application/javascript">
+var doNotTrack = false;
+if (!doNotTrack) {
+	(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+	(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+	m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+	})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+	ga('create', 'UA-167990863-1', 'auto');
+	
+	ga('send', 'pageview');
+}
+</script>
+
+
+
+<link rel="stylesheet" href="/assets/style.css">
+
+
+
+
+
+
+<link rel="apple-touch-icon-precomposed" sizes="144x144" href="/img/apple-touch-icon-144-precomposed.png">
+
+  <link rel="shortcut icon" href="/img/favicon/orange.png">
+
+
+
+<meta name="twitter:card" content="summary" />
+
+<meta name="twitter:creator" content="" />
+
+
+<meta property="og:locale" content="zh" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="深入浅出 PG 数据膨胀 :: Keep Curiosity">
+<meta property="og:description" content="多版本并发控制 MVCC 多版本并发控制，是数据库管理系统常用的一种并发控制，每个事务读到的数据项都是一个历史快照（snapshot）并依赖于实现的隔离级别。写操作不覆盖已有数据项，而是创建一个新的版本，直至所在操作提交时才变为可见。Postgres（以下简称PG）中的多版本，是保存在各个表中的，相比较 MySQL 是保存在全局中的。
+隐藏的版本信息 PG 各个表独立保存着多版本信息，也意味着在每条记录都有版本号。通过一些技巧可以挖掘到这些隐藏的信息。
+pg_ninja=# \d employee Table &amp;quot;public.employee&amp;quot; Column | Type | Modifiers ---------&#43;-----------------------&#43;----------- emp_id | integer | not null name | character varying(20) | dept_id | integer | Indexes: &amp;quot;employee_pkey&amp;quot; PRIMARY KEY, btree (emp_id) 在 pg_attribute 中可以看到几个隐藏的字段：
+pg_ninja=# SELECT attname, format_type (atttypid, atttypmod) pg_ninja-# FROM pg_attribute pg_ninja-# WHERE attrelid::regclass::text=&#39;employee&#39; pg_ninja-# ORDER BY attnum; attname | format_type ----------&#43;----------------------- tableoid | oid cmax | cid xmax | xid cmin | cid xmin | xid ctid | tid emp_id | integer name | character varying(20) dept_id | integer (9 rows) 通过 SELECT 返回隐藏字段的值：" />
+<meta property="og:url" content="/posts/database/pg_bloat/" />
+<meta property="og:site_name" content="深入浅出 PG 数据膨胀" />
+
+  
+    <meta property="og:image" content="/img/favicon/orange.png">
+  
+
+<meta property="og:image:width" content="2048">
+<meta property="og:image:height" content="1024">
+
+
+  <meta property="article:published_time" content="2020-03-29 07:41:53 &#43;0800 &#43;0800" />
+
+
+
+
+
+
+
+
+
+
+
+
+</head>
+<body class="">
+
+
+<div class="container headings--one-size">
+
+  <header class="header">
+  <div class="header__inner">
+    <div class="header__logo">
+      <a href="/">
+  <div class="logo">
+    保持好奇心
+  </div>
+</a>
+
+    </div>
+    <div class="menu-trigger">menu</div>
+  </div>
+  
+    <nav class="menu">
+  <ul class="menu__inner menu__inner--desktop">
+    
+      
+        
+          <li><a href="/about">About</a></li>
+        
+      
+        
+          <li><a href="/archive">Archive</a></li>
+        
+      
+      
+    
+
+    
+  </ul>
+
+  <ul class="menu__inner menu__inner--mobile">
+    
+      
+        <li><a href="/about">About</a></li>
+      
+    
+      
+        <li><a href="/archive">Archive</a></li>
+      
+    
+    
+  </ul>
+</nav>
+
+  
+</header>
+
+
+  <div class="content">
+    
+<div class="post">
+  <h1 class="post-title">
+    <a href="/posts/database/pg_bloat/">深入浅出 PG 数据膨胀</a></h1>
+  <div class="post-meta">
+      
+    <span class="post-date">
+      2020-03-29
+    </span>
+    
+    
+  </div>
+
+  
+  <span class="post-tags">
+    
+    #<a href="/tags/database/">database</a>&nbsp;
+    
+  </span>
+  
+
+  
+
+  <div class="post-content"><div>
+        <h2 id="多版本并发控制-mvcc">多版本并发控制 MVCC<a href="#多版本并发控制-mvcc" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h2>
+<p>多版本并发控制，是数据库管理系统常用的一种并发控制，每个事务读到的数据项都是一个历史快照（snapshot）并依赖于实现的隔离级别。写操作不覆盖已有数据项，而是创建一个新的版本，直至所在操作提交时才变为可见。Postgres（以下简称PG）中的多版本，是保存在各个表中的，相比较 MySQL 是保存在全局中的。</p>
+<h3 id="隐藏的版本信息">隐藏的版本信息<a href="#隐藏的版本信息" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h3>
+<p>PG 各个表独立保存着多版本信息，也意味着在每条记录都有版本号。通过一些技巧可以挖掘到这些隐藏的信息。</p>
+<pre><code>pg_ninja=# \d employee
+           Table &quot;public.employee&quot;
+ Column  |         Type          | Modifiers
+---------+-----------------------+-----------
+ emp_id  | integer               | not null
+ name    | character varying(20) |
+ dept_id | integer               |
+Indexes:
+    &quot;employee_pkey&quot; PRIMARY KEY, btree (emp_id)
+</code></pre><p>在 <code>pg_attribute</code> 中可以看到几个隐藏的字段：</p>
+<pre><code>pg_ninja=# SELECT attname, format_type (atttypid, atttypmod)
+pg_ninja-# FROM pg_attribute
+pg_ninja-# WHERE attrelid::regclass::text='employee'
+pg_ninja-# ORDER BY attnum;
+ attname  |      format_type
+----------+-----------------------
+ tableoid | oid
+ cmax     | cid
+ xmax     | xid
+ cmin     | cid
+ xmin     | xid
+ ctid     | tid
+ emp_id   | integer
+ name     | character varying(20)
+ dept_id  | integer
+(9 rows)
+</code></pre><p>通过 <code>SELECT</code> 返回隐藏字段的值：</p>
+<pre><code>pg_ninja=# SELECT txid_current();
+ txid_current
+--------------
+      1088042
+(1 row)
+
+pg_ninja=# INSERT into employee VALUES (9,'avi',9);
+INSERT 0 1
+pg_ninja=# SELECT xmin,xmax,* FROM employee where emp_id = 9;
+  xmin   | xmax | emp_id | name | dept_id
+---------+------+--------+------+---------
+ 1088043 |    0 |      9 | avi  |       9
+(1 row)
+</code></pre><p>xmin：记录了创建（INSERT）记录的事务 ID（简称 xid）。</p>
+<p>通过 <code>SELECT txid_current()</code> 可以得到当前的 xid，下一个 INSERT 的 xid 是当前 <code>xid+1</code> 就是 1088043，与保存在 <code>xmin</code> 中的值相等。</p>
+<p>xmax：记录了删除（DELETE）记录的 xid。</p>
+<p>删除之后该记录就不能简单的 SELECT 返回，这里通过两个会话在验证 xmax 的值。</p>
+<p>在终端 A 中开始事务，删除但不提交。</p>
+<pre><code>pg_ninja=# begin;
+BEGIN
+pg_ninja=# SELECT txid_current();
+ txid_current
+--------------
+      1088046
+(1 row)
+
+pg_ninja=# DELETE FROM employee where emp_id = 9;
+DELETE 1
+</code></pre><p>在终端 B 中连接数据库，查询 xmax 值。</p>
+<pre><code>pg_ninja=# SELECT xmin, xmax, * FROM employee where emp_id = 9;
+  xmin   |  xmax   | emp_id | name | dept_id
+---------+---------+--------+------+---------
+ 1088043 | 1088046 |      9 | avi  |       9
+(1 row)
+</code></pre><p>因为在一个事务中，<code>SELECT txid_current()</code> 就是删除语句的 xid 即 1088046，与保存在 <code>xmax</code> 中的值相等。</p>
+<h3 id="删除-的记录">“删除” 的记录<a href="#删除-的记录" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h3>
+<p>删除的记录在 PG 中并没有真正的删除。通过 pageinspect 模块可以窥视 PG 底层的存储秘密。</p>
+<pre><code>pg_ninja=# CREATE EXTENSION pageinspect;
+pg_ninja=# INSERT into employee values (generate_series(1,10),'avi',1);
+INSERT 0 10
+pg_ninja=# SELECT t_xmin, t_xmax, t_data FROM heap_page_items(get_raw_page('employee', 0));
+ t_xmin  | t_xmax |           t_data
+---------+--------+----------------------------
+ 1089069 |      0 | \x010000000961766901000000
+ 1089069 |      0 | \x020000000961766901000000
+ 1089069 |      0 | \x030000000961766901000000
+ 1089069 |      0 | \x040000000961766901000000
+ 1089069 |      0 | \x050000000961766901000000
+ 1089069 |      0 | \x060000000961766901000000
+ 1089069 |      0 | \x070000000961766901000000
+ 1089069 |      0 | \x080000000961766901000000
+ 1089069 |      0 | \x090000000961766901000000
+ 1089069 |      0 | \x0a0000000961766901000000
+(10 rows)
+</code></pre><p>删除其中的五条记录。</p>
+<pre><code>pg_ninja=# DELETE FROM employee where emp_id  &gt; 5;
+DELETE 5
+pg_ninja=# SELECT t_xmin, t_xmax, t_data FROM heap_page_items(get_raw_page('employee', 0));
+ t_xmin  | t_xmax  |           t_data
+---------+---------+----------------------------
+ 1089069 |       0 | \x010000000961766901000000
+ 1089069 |       0 | \x020000000961766901000000
+ 1089069 |       0 | \x030000000961766901000000
+ 1089069 |       0 | \x040000000961766901000000
+ 1089069 |       0 | \x050000000961766901000000
+ 1089069 | 1089147 | \x060000000961766901000000
+ 1089069 | 1089147 | \x070000000961766901000000
+ 1089069 | 1089147 | \x080000000961766901000000
+ 1089069 | 1089147 | \x090000000961766901000000
+ 1089069 | 1089147 | \x0a0000000961766901000000
+(10 rows)
+</code></pre><p>可以看到删除的记录依然在底层存储中。</p>
+<p>更新剩下的五条记录。</p>
+<pre><code>pg_ninja=# UPDATE employee SET emp_name = 'avii';
+UPDATE 5
+pg_ninja=# SELECT t_xmin, t_xmax, t_data FROM heap_page_items(get_raw_page('employee', 0));
+ t_xmin  | t_xmax  |               t_data
+---------+---------+------------------------------------
+ 1089069 | 1089148 | \x010000000961766901000000
+ 1089069 | 1089148 | \x020000000961766901000000
+ 1089069 | 1089148 | \x030000000961766901000000
+ 1089069 | 1089148 | \x040000000961766901000000
+ 1089069 | 1089148 | \x050000000961766901000000
+ 1089069 | 1089147 | \x060000000961766901000000
+ 1089069 | 1089147 | \x070000000961766901000000
+ 1089069 | 1089147 | \x080000000961766901000000
+ 1089069 | 1089147 | \x090000000961766901000000
+ 1089069 | 1089147 | \x0a0000000961766901000000
+ 1089148 |       0 | \x010000000b6176696900000001000000
+ 1089148 |       0 | \x020000000b6176696900000001000000
+ 1089148 |       0 | \x030000000b6176696900000001000000
+ 1089148 |       0 | \x040000000b6176696900000001000000
+ 1089148 |       0 | \x050000000b6176696900000001000000
+(15 rows)
+</code></pre><p>PG 更新的逻辑是删除并创建，可以看到这里返回了15条记录，其中10条记录了 <code>t_xmax</code>（其中5条是更新时删除的），另外新创建的5条记录的 <code>t_xmin</code> 值是新的 xid，而 <code>t_xmax</code> 值为 0。</p>
+<h2 id="vacuum">Vacuum<a href="#vacuum" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h2>
+<p>很显然，维护这样的版本信息的存储成本是巨大的，尤其是更新频繁的表。PG 解决方案就是 Vacuum。这些删除的数据在 PG 中叫做 dead tuple。一旦没有任何事务使用这些数据，这些数据就可以安全的被删除。Vacuum 就是承担了清理这些数据的工作。</p>
+<h2 id="从库的热反馈-hot-standby-feedback-以下简称-hsf">从库的热反馈 (Hot Standby Feedback 以下简称 HSF)<a href="#从库的热反馈-hot-standby-feedback-以下简称-hsf" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h2>
+<p>在配置了主从后，如果打开了 HSF，HSF 会将当前从库的最小 xid 发给主库，目的是解决同步冲突问题。如果从库在使用某些记录，即使在主库中已经删除，并且主库中没有任何事务使用该记录，Vacuum 依然会保留该记录。</p>
+<p>Reference:</p>
+<ul>
+<li><a href="https://www.percona.com/blog/2018/08/06/basic-understanding-bloat-vacuum-postgresql-mvcc/">https://www.percona.com/blog/2018/08/06/basic-understanding-bloat-vacuum-postgresql-mvcc/</a></li>
+<li><a href="https://www.postgresql.org/docs/9.6/routine-vacuuming.html">https://www.postgresql.org/docs/9.6/routine-vacuuming.html</a></li>
+</ul>
+
+      </div></div>
+
+  
+  
+<div class="pagination">
+    <div class="pagination__title">
+        <span class="pagination__title-h">其他博客</span>
+        <hr />
+    </div>
+    <div class="pagination__buttons">
+        
+        <span class="button previous">
+            <a href="/posts/go/lock-in-function/">
+                <span class="button__icon">←</span>
+                <span class="button__text">高效用锁之巧用立即执行函数</span>
+            </a>
+        </span>
+        
+        
+        <span class="button next">
+            <a href="/posts/go/error/">
+                <span class="button__text">浅谈 Go 语言的错误</span>
+                <span class="button__icon">→</span>
+            </a>
+        </span>
+        
+    </div>
+</div>
+
+  
+
+  
+
+</div>
+
+  </div>
+
+  
+    <footer class="footer">
+  <div class="footer__inner">
+    
+      <div class="copyright">
+        <span>© 2020 Powered by <a href="http://gohugo.io">Hugo</a></span>
+    
+        <span>:: Theme made by <a href="https://twitter.com/panr">panr</a></span>
+      </div>
+  </div>
+</footer>
+
+<script src="/assets/main.js"></script>
+<script src="/assets/prism.js"></script>
+
+
+
+
+
+  
+</div>
+
+</body>
+</html>

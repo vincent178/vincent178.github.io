@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>database on Keep Curiosity</title>
+    <link>/tags/database/</link>
+    <description>Recent content in database on Keep Curiosity</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>zh</language>
+    <lastBuildDate>Sun, 29 Mar 2020 07:41:53 +0800</lastBuildDate>
+    
+	<atom:link href="/tags/database/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>深入浅出 PG 数据膨胀</title>
+      <link>/posts/database/pg_bloat/</link>
+      <pubDate>Sun, 29 Mar 2020 07:41:53 +0800</pubDate>
+      
+      <guid>/posts/database/pg_bloat/</guid>
+      <description>多版本并发控制 MVCC 多版本并发控制，是数据库管理系统常用的一种并发控制，每个事务读到的数据项都是一个历史快照（snapshot）并依赖于实现的隔离级别。写操作不覆盖已有数据项，而是创建一个新的版本，直至所在操作提交时才变为可见。Postgres（以下简称PG）中的多版本，是保存在各个表中的，相比较 MySQL 是保存在全局中的。
+隐藏的版本信息 PG 各个表独立保存着多版本信息，也意味着在每条记录都有版本号。通过一些技巧可以挖掘到这些隐藏的信息。
+pg_ninja=# \d employee Table &amp;quot;public.employee&amp;quot; Column | Type | Modifiers ---------+-----------------------+----------- emp_id | integer | not null name | character varying(20) | dept_id | integer | Indexes: &amp;quot;employee_pkey&amp;quot; PRIMARY KEY, btree (emp_id) 在 pg_attribute 中可以看到几个隐藏的字段：
+pg_ninja=# SELECT attname, format_type (atttypid, atttypmod) pg_ninja-# FROM pg_attribute pg_ninja-# WHERE attrelid::regclass::text=&#39;employee&#39; pg_ninja-# ORDER BY attnum; attname | format_type ----------+----------------------- tableoid | oid cmax | cid xmax | xid cmin | cid xmin | xid ctid | tid emp_id | integer name | character varying(20) dept_id | integer (9 rows) 通过 SELECT 返回隐藏字段的值：</description>
+    </item>
+    
+  </channel>
+</rss>

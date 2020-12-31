@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+  xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  
+  <url>
+    <loc>/posts/2020-report/</loc>
+    <lastmod>2020-12-31T16:56:33+08:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/</loc>
+    <lastmod>2020-12-31T16:56:33+08:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/posts/</loc>
+    <lastmod>2020-12-31T16:56:33+08:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/posts/go/unsafe/</loc>
+    <lastmod>2020-06-02T09:29:44+08:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/tags/go/</loc>
+    <lastmod>2020-04-26T05:26:13+08:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/tags/</loc>
+    <lastmod>2020-04-26T05:26:13+08:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/posts/go/lock-in-function/</loc>
+    <lastmod>2020-04-26T05:26:13+08:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/tags/database/</loc>
+    <lastmod>2020-03-29T07:41:53+08:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/posts/database/pg_bloat/</loc>
+    <lastmod>2020-03-29T07:41:53+08:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/posts/go/error/</loc>
+    <lastmod>2020-02-01T00:00:00+08:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/posts/go/assembly/</loc>
+    <lastmod>2020-01-01T00:00:00+08:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/tags/javascript/</loc>
+    <lastmod>2018-05-08T09:02:46+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/posts/javascript/node-network-programming/</loc>
+    <lastmod>2018-05-08T09:02:46+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/posts/javascript/browser-event-loop/</loc>
+    <lastmod>2018-05-02T19:43:13+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/categories/</loc>
+  </url>
+  
+  <url>
+    <loc>/about/</loc>
+  </url>
+  
+</urlset>

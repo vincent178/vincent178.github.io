@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  
+    <title>浏览器事件循环 :: Keep Curiosity — 保持好奇心</title>
+  
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<meta name="description" content="学习 Javascript 的过程中，事件循环是一个绕不开的话题。异步？？？，事件模型？？？任务？？？事件循环？？？这些都是什么意思？
+" />
+<meta name="keywords" content="golang kubernetes blog 博客" />
+<meta name="robots" content="noodp" />
+<link rel="canonical" href="/posts/javascript/browser-event-loop/" />
+
+
+<script type="application/javascript">
+var doNotTrack = false;
+if (!doNotTrack) {
+	(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+	(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+	m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+	})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+	ga('create', 'UA-167990863-1', 'auto');
+	
+	ga('send', 'pageview');
+}
+</script>
+
+
+
+<link rel="stylesheet" href="/assets/style.css">
+
+
+
+
+
+
+<link rel="apple-touch-icon-precomposed" sizes="144x144" href="/img/apple-touch-icon-144-precomposed.png">
+
+  <link rel="shortcut icon" href="/img/favicon/orange.png">
+
+
+
+<meta name="twitter:card" content="summary" />
+
+<meta name="twitter:creator" content="" />
+
+
+<meta property="og:locale" content="zh" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="浏览器事件循环 :: Keep Curiosity">
+<meta property="og:description" content="学习 Javascript 的过程中，事件循环是一个绕不开的话题。异步？？？，事件模型？？？任务？？？事件循环？？？这些都是什么意思？
+" />
+<meta property="og:url" content="/posts/javascript/browser-event-loop/" />
+<meta property="og:site_name" content="浏览器事件循环" />
+
+  
+    <meta property="og:image" content="/img/favicon/orange.png">
+  
+
+<meta property="og:image:width" content="2048">
+<meta property="og:image:height" content="1024">
+
+
+  <meta property="article:published_time" content="2018-05-02 19:43:13 &#43;0000 UTC" />
+
+
+
+
+
+
+
+
+
+
+
+
+</head>
+<body class="">
+
+
+<div class="container headings--one-size">
+
+  <header class="header">
+  <div class="header__inner">
+    <div class="header__logo">
+      <a href="/">
+  <div class="logo">
+    保持好奇心
+  </div>
+</a>
+
+    </div>
+    <div class="menu-trigger">menu</div>
+  </div>
+  
+    <nav class="menu">
+  <ul class="menu__inner menu__inner--desktop">
+    
+      
+        
+          <li><a href="/about">About</a></li>
+        
+      
+        
+          <li><a href="/archive">Archive</a></li>
+        
+      
+      
+    
+
+    
+  </ul>
+
+  <ul class="menu__inner menu__inner--mobile">
+    
+      
+        <li><a href="/about">About</a></li>
+      
+    
+      
+        <li><a href="/archive">Archive</a></li>
+      
+    
+    
+  </ul>
+</nav>
+
+  
+</header>
+
+
+  <div class="content">
+    
+<div class="post">
+  <h1 class="post-title">
+    <a href="/posts/javascript/browser-event-loop/">浏览器事件循环</a></h1>
+  <div class="post-meta">
+      
+    <span class="post-date">
+      2018-05-02
+    </span>
+    
+    
+  </div>
+
+  
+  <span class="post-tags">
+    
+    #<a href="/tags/javascript/">javascript</a>&nbsp;
+    
+  </span>
+  
+
+  
+
+  <div class="post-content"><div>
+        <p>学习 Javascript 的过程中，事件循环是一个绕不开的话题。异步？？？，事件模型？？？任务？？？事件循环？？？这些都是什么意思？</p>
+<p><a href="https://www.w3.org/TR/html5/webappapis.html#event-loops">https://www.w3.org/TR/html5/webappapis.html#event-loops</a> 手册上是这么说的: 事件循环其实是浏览器和事件, 用户交互，渲染，网络请求等等协作的机制, 时间循环有一个或者多个任务队列，这些任务包括解析HTML，处理回调函数，网络请求等等。</p>
+<div style="display: flex; justify-content: center; align-items: center;">
+![黑人问号](/images/???.jpeg)
+</div>
+<p>在看了<a href="https://www.youtube.com/watch?v=8aGhZQkoFbQ">Philip Roberts在JSConf上面的session</a>之后:</p>
+<blockquote>
+<p>我好像有点懂了</p>
+</blockquote>
+<h2 id="栈">栈<a href="#栈" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h2>
+<pre><code>function foo() {
+    console.log(&quot;foo&quot;);
+}
+
+function bar() {
+    foo();
+}
+
+bar()
+</code></pre><p><a href="http://latentflip.com/loupe/?code=ZnVuY3Rpb24gZm9vKCkgewogICAgY29uc29sZS5sb2coImZvbyIpOwp9CgpmdW5jdGlvbiBiYXIoKSB7CiAgICBmb28oKTsKfQoKYmFyKCk%3D!!!PGJ1dHRvbj5DbGljayBtZSE8L2J1dHRvbj4%3D">可视化</a>
+js读取文件，调用函数就压到栈里面，可以执行返回就执行并且退出栈，直到所有都运行完成，很简单。
+js在运行的过程中，更确切一些，在栈中有代码需要运行的时候，用户界面是无法响应其他事情的。</p>
+<h2 id="回调队列">回调队列<a href="#回调队列" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h2>
+<pre><code>function foo() {
+    console.log(&quot;foo&quot;);
+}
+
+function bar() {
+    setTimeout(foo(), 1000);
+}
+
+bar()
+</code></pre><p><a href="http://latentflip.com/loupe/?code=ZnVuY3Rpb24gZm9vKCkgewogICAgY29uc29sZS5sb2coImZvbyIpOwp9CgpmdW5jdGlvbiBiYXIoKSB7CiAgICBzZXRUaW1lb3V0KGZvbygpLCAxMDAwKTsKfQoKYmFyKCk%3D!!!PGJ1dHRvbj5DbGljayBtZSE8L2J1dHRvbj4%3D">可视化</a>
+setTimeout是浏览器实现的API，他的计时器在计算到了1000ms之后会把回调函数放入事件循环的队列里面，<strong>在栈为空的情况下</strong>，浏览器会在队列拿出第一个来压到栈里面执行。这就是为什么setTimeout不是严格的1s后执行，而是至少1s后执行。</p>
+<p>看看这个例子:</p>
+<pre><code>for (var i = 0; i &lt; 10; i++) {
+    console.log(&quot;Hello &quot;, i);
+}
+
+for (var i = 0; i &lt; 10; i++) {
+    setTimeout(() =&gt; {
+        console.log(&quot;Hello &quot;, i);
+    }, 0);
+}
+</code></pre><p>代码想要做的事情都是一样的，打印 Hello 1 - 9， 但实际效果是不同，第一段是持续运行，会阻止用户界面的响应，而第二段代码是把 console.log 放入队列中，这就给了浏览器在运行代码过程中响应用户的机会。 <s>这里还有一个梗，看出来了吗？</s></p>
+<p>再读一遍手册上面的定义，是不是已经理解事件循环了。</p>
+<div style="display: flex; justify-content: center; align-items: center;">
+![](/images/harden-eye.jpeg)
+</div>
+<h2 id="当然事情并没有那么简单">当然事情并没有那么简单<a href="#当然事情并没有那么简单" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h2>
+<p>来看看另外一个例子</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-javascript" data-lang="javascript"><span style="color:#a6e22e">console</span>.<span style="color:#a6e22e">log</span>(<span style="color:#e6db74">&#39;script start&#39;</span>);
+
+<span style="color:#a6e22e">setTimeout</span>(<span style="color:#66d9ef">function</span>() {
+  <span style="color:#a6e22e">console</span>.<span style="color:#a6e22e">log</span>(<span style="color:#e6db74">&#39;setTimeout&#39;</span>);
+}, <span style="color:#ae81ff">0</span>);
+
+Promise.<span style="color:#a6e22e">resolve</span>().<span style="color:#a6e22e">then</span>(<span style="color:#66d9ef">function</span>() {
+  <span style="color:#a6e22e">console</span>.<span style="color:#a6e22e">log</span>(<span style="color:#e6db74">&#39;promise1&#39;</span>);
+}).<span style="color:#a6e22e">then</span>(<span style="color:#66d9ef">function</span>() {
+  <span style="color:#a6e22e">console</span>.<span style="color:#a6e22e">log</span>(<span style="color:#e6db74">&#39;promise2&#39;</span>);
+});
+
+<span style="color:#a6e22e">console</span>.<span style="color:#a6e22e">log</span>(<span style="color:#e6db74">&#39;script end&#39;</span>);
+</code></pre></div><p>我第一次看到这段代码回答就是</p>
+<pre><code>script start
+script end
+setTimeout
+promise1
+promise2
+</code></pre><p>我这么说肯定这个答案是不对的，不对的原因是什么？</p>
+<div style="display: flex; justify-content: center; align-items: center;">
+![](/images/not-easy.jpeg)
+</div>
+<p>setTimeout 会把回调函数放入队列里面，<strong>作为Task</strong>, 而Promise也会放入队列里面，<strong>作为Microtask</strong>，Microtask比Task拥有更高优先级，在栈为空后要立即执行Microtask，而且如果队列中有Microtask，必须执行完所有的Microtask才能返回去执行Task。
+除了Promise，MutationObserver也是Microtask。</p>
+<h2 id="boss战">Boss战<a href="#boss战" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h2>
+<div style="display: flex; justify-content: center; align-items: center;">
+![灭霸](/images/mieba.jpg)
+</div>
+<pre><code># HTML
+&lt;div class=&quot;outer&quot;&gt;
+  &lt;div class=&quot;inner&quot;&gt;&lt;/div&gt;
+&lt;/div&gt;
+
+# JS
+// Let's get hold of those elements
+var outer = document.querySelector('.outer');
+var inner = document.querySelector('.inner');
+
+// Let's listen for attribute changes on the
+// outer element
+new MutationObserver(function() {
+  console.log('mutate');
+}).observe(outer, {
+  attributes: true
+});
+
+// Here's a click listener…
+function onClick() {
+  console.log('click');
+
+  setTimeout(function() {
+    console.log('timeout');
+  }, 0);
+
+  Promise.resolve().then(function() {
+    console.log('promise');
+  });
+
+  outer.setAttribute('data-random', Math.random());
+}
+
+// …which we'll attach to both elements
+inner.addEventListener('click', onClick);
+outer.addEventListener('click', onClick);
+</code></pre><h2 id="测试">测试<a href="#测试" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h2>
+<style>
+    .outer {
+        background: grey;
+        height: 100px;
+        width: 100px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+        margin-bottom: 36px;
+    }
+
+    .inner {
+        background: green;
+        width: 50px;
+        height: 50px;
+    }
+
+    #result-panel {
+        outline: none;
+        resize: none;
+        font-size: 1.1em;
+    }
+</style>
+<div class="outer">
+    <div class="inner"></div>
+</div>
+<p>点击绿色的方块查看结果
+<textarea id="result-panel" wrap="off" rows="8"></textarea></p>
+<p>所以你答对了吗？</p>
+<script>
+var outer = document.querySelector('.outer');
+var inner = document.querySelector('.inner');
+
+function log(msg) {
+    $('#result-panel').append(msg);
+    $('#result-panel').append("\n");
+}
+
+new MutationObserver(function() {
+  log('mutate');
+}).observe(outer, {
+  attributes: true
+});
+
+
+function onClick() {
+  log('click');
+
+  setTimeout(function() {
+    log('timeout');
+  }, 0);
+
+  Promise.resolve().then(function() {
+    log('promise');
+  });
+
+  outer.setAttribute('data-random', Math.random());
+}
+
+inner.addEventListener('click', onClick);
+outer.addEventListener('click', onClick);
+</script>
+      </div></div>
+
+  
+  
+<div class="pagination">
+    <div class="pagination__title">
+        <span class="pagination__title-h">其他博客</span>
+        <hr />
+    </div>
+    <div class="pagination__buttons">
+        
+        <span class="button previous">
+            <a href="/posts/javascript/node-network-programming/">
+                <span class="button__icon">←</span>
+                <span class="button__text">Node 网络编程</span>
+            </a>
+        </span>
+        
+        
+    </div>
+</div>
+
+  
+
+  
+
+</div>
+
+  </div>
+
+  
+    <footer class="footer">
+  <div class="footer__inner">
+    
+      <div class="copyright">
+        <span>© 2020 Powered by <a href="http://gohugo.io">Hugo</a></span>
+    
+        <span>:: Theme made by <a href="https://twitter.com/panr">panr</a></span>
+      </div>
+  </div>
+</footer>
+
+<script src="/assets/main.js"></script>
+<script src="/assets/prism.js"></script>
+
+
+
+
+
+  
+</div>
+
+</body>
+</html>

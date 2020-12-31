@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Keep Curiosity</title>
+    <link>/</link>
+    <description>Recent content on Keep Curiosity</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>zh</language>
+    <lastBuildDate>Thu, 31 Dec 2020 16:56:33 +0800</lastBuildDate>
+    
+	<atom:link href="/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>2020 年度总结</title>
+      <link>/posts/2020-report/</link>
+      <pubDate>Thu, 31 Dec 2020 16:56:33 +0800</pubDate>
+      
+      <guid>/posts/2020-report/</guid>
+      <description>开源社区 给 kubernetes chaos-mesh tidb-operator 贡献了代码。
+持续维护 fastify 的翻译工作。
+参与编写 《TiDB In Action》 其中两个小节。
+参加了 TiDB 易用性挑战赛，拿了第五名。
+开源了第一个用 Swift 写的库 DNS。
+博客 没完成6篇博客的目标： 今年一共写了5篇。
+阅读 没完成阅读3本书目标：今年没有看完一本书。 正在阅读的《深入理解计算机系统》看到了 114 页。
+软件和应用 开发了《潮鞋交易助手》小程序，累计用户1.3k，12月引入了广告，累计收入14元。
+其他 运营自己的微信公众号“Flex实验室”，把博客文章同时发布上面。</description>
+    </item>
+    
+    <item>
+      <title>浅谈 Go 语言的 unsafe 包</title>
+      <link>/posts/go/unsafe/</link>
+      <pubDate>Tue, 02 Jun 2020 09:29:44 +0800</pubDate>
+      
+      <guid>/posts/go/unsafe/</guid>
+      <description>&lt;p&gt;&lt;img src=&#34;/go/unsafe.png&#34; alt=&#34;unsafe&#34;&gt;&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>高效用锁之巧用立即执行函数</title>
+      <link>/posts/go/lock-in-function/</link>
+      <pubDate>Sun, 26 Apr 2020 05:26:13 +0800</pubDate>
+      
+      <guid>/posts/go/lock-in-function/</guid>
+      <description>锁在 go 的代码中很常见。并发编程中锁保护对共享内存的读取和改动，不会出现竞争（race condition）。
+type person struct { mux sync.Mutex name string // ... } func (s *person) UpdateName(name string) error { s.mux.Lock() defer s.mux.Unlock() // ...  s.name = name // ... } 高效使用锁的一个要点就是锁变量不锁过程，也就是只锁需要在并发下获取或改变的变量。
+根据这个优化一下上面的代码，移除 defer 代码，只在变量的上下调用锁。
+func (s *person) UpdateName(name string) error { // ...  s.mux.Lock() s.name = name s.mux.Unlock() // ... } 但因为移除了 defer 代码块，提高了维护成本。在复杂的代码情景下，会有可能忘了调用 Unlock 或者在 Lock 和 Unlock 中间插入了不应该由锁保护的代码导致性能下降。
+那么有没有办法保留 defer 同时只保护 name 变量呢？引入一个新的立即执行函数。</description>
+    </item>
+    
+    <item>
+      <title>深入浅出 PG 数据膨胀</title>
+      <link>/posts/database/pg_bloat/</link>
+      <pubDate>Sun, 29 Mar 2020 07:41:53 +0800</pubDate>
+      
+      <guid>/posts/database/pg_bloat/</guid>
+      <description>多版本并发控制 MVCC 多版本并发控制，是数据库管理系统常用的一种并发控制，每个事务读到的数据项都是一个历史快照（snapshot）并依赖于实现的隔离级别。写操作不覆盖已有数据项，而是创建一个新的版本，直至所在操作提交时才变为可见。Postgres（以下简称PG）中的多版本，是保存在各个表中的，相比较 MySQL 是保存在全局中的。
+隐藏的版本信息 PG 各个表独立保存着多版本信息，也意味着在每条记录都有版本号。通过一些技巧可以挖掘到这些隐藏的信息。
+pg_ninja=# \d employee Table &amp;quot;public.employee&amp;quot; Column | Type | Modifiers ---------+-----------------------+----------- emp_id | integer | not null name | character varying(20) | dept_id | integer | Indexes: &amp;quot;employee_pkey&amp;quot; PRIMARY KEY, btree (emp_id) 在 pg_attribute 中可以看到几个隐藏的字段：
+pg_ninja=# SELECT attname, format_type (atttypid, atttypmod) pg_ninja-# FROM pg_attribute pg_ninja-# WHERE attrelid::regclass::text=&#39;employee&#39; pg_ninja-# ORDER BY attnum; attname | format_type ----------+----------------------- tableoid | oid cmax | cid xmax | xid cmin | cid xmin | xid ctid | tid emp_id | integer name | character varying(20) dept_id | integer (9 rows) 通过 SELECT 返回隐藏字段的值：</description>
+    </item>
+    
+    <item>
+      <title>浅谈 Go 语言的错误</title>
+      <link>/posts/go/error/</link>
+      <pubDate>Sat, 01 Feb 2020 00:00:00 +0800</pubDate>
+      
+      <guid>/posts/go/error/</guid>
+      <description>Go 一直把错误作为一个普通的值，一个包含一段文本信息的类型为错误的值，而这在 1.13 版本之后发生了改变。
+ 1.13 版本之前 Go 中任意类型只要实现了 error 接口的都可以称为错误。
+type error interface { Error() string } 程序中通常会直接用 errors.New 生成错误，调用者拿到错误的时候可以直接用 == 做错误判断：
+var ErrNotFound = errors.New(&amp;#34;not found&amp;#34;) if err == ErrNotFound { // 错误处理 } 当简单的错误不能满足业务要求时，也会自己定义 struct 来实现 error 接口，然后需要通过类型断言 (type assertion or type switch) 做错误判断：
+type NotFoundError struct { Name string } func (e *NotFoundError) Error() string { return e.Name + &amp;#34;: not found&amp;#34; } if e, ok := err.</description>
+    </item>
+    
+    <item>
+      <title>浅谈 Go 语言的汇编</title>
+      <link>/posts/go/assembly/</link>
+      <pubDate>Wed, 01 Jan 2020 00:00:00 +0800</pubDate>
+      
+      <guid>/posts/go/assembly/</guid>
+      <description>命令默认跑在 MacBook Pro (15-inch, 2018)，Intel Core i7 go version go1.13.1 darwin/amd64
+因为我之前没有学过汇编，所以文中难免有错误或者疏漏的地方，如果你发现有疑问，尽情的提出来吧。
+ Assembler is how you talk to machine in the lowest level. &amp;ndash; Rob Pike
+ 当然，学习和理解 Go 的汇编并不是为了手撸汇编，而是给我们一种了解语言的工具。这是我身边同学的两个问题：
+ new 操作符和初始化结构体的异同  type Person struct { Name string } // what&amp;#39;s the difference between new(Person) // and &amp;amp;Person{} Go 的结构体 method 和普通的参数异同  // what&amp;#39;s the difference between func (p *Person) name() string { return p.Name } // and func name(p *Person) string { return p.</description>
+    </item>
+    
+    <item>
+      <title>Node 网络编程</title>
+      <link>/posts/javascript/node-network-programming/</link>
+      <pubDate>Tue, 08 May 2018 09:02:46 +0000</pubDate>
+      
+      <guid>/posts/javascript/node-network-programming/</guid>
+      <description>![](images/16-sockets-logical.png)   最近看 WebSocket，把涉及到的 tcp socket 这一层Node源代码梳理了一下
+有说的不对的地方，希望大家指正
+ 代码 Node 版本： 8.9.4
+const server = new net.Server((socket) =&amp;gt; { console.log(socket); }); server.listen(&amp;#39;1234&amp;#39;, () =&amp;gt; { console.log(&amp;#39;server started at 1234&amp;#39;); }); Socket 服务器 socket 是用于监听连接而不是发起连接，其生命周期通常由创建，绑定，监听，连接，关闭组成的。
+为了便于说明，把上面代码划分为四块：
+1) new net.Server() 2) socket =&amp;gt; console.log(socket) 3) server.listen() 4) () =&amp;gt; console.log(&#39;server started at 1234&#39;) 服务器启动流程 运行代码, 我们可以通过 lsof 看到一个 socket 处于 LISTEN 状态, 这就是服务器 socket.
+$ lsof -i tcp:1234 COMMAND PID USER FD TYPE DEVICE SIZE/OFF NODE NAME node 64852 i312714 14u IPv6 0xe781f0e6b2c52e5b 0t0 TCP *:search-agent (LISTEN) 在代码块1 我们初始化了 net.</description>
+    </item>
+    
+    <item>
+      <title>浏览器事件循环</title>
+      <link>/posts/javascript/browser-event-loop/</link>
+      <pubDate>Wed, 02 May 2018 19:43:13 +0000</pubDate>
+      
+      <guid>/posts/javascript/browser-event-loop/</guid>
+      <description>&lt;p&gt;学习 Javascript 的过程中，事件循环是一个绕不开的话题。异步？？？，事件模型？？？任务？？？事件循环？？？这些都是什么意思？&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>关于我</title>
+      <link>/about/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/about/</guid>
+      <description>后端工程师，目前就职于 GOAT
+现在最喜欢的语言是 Go，写过 Go，Ruby，Typescript，Javascript
+开源项目   LOON (https://github.com/loon-project/loon) [ 131 Stars ]
+用 Typescript 实现的 web 框架
+  Flexrouter (https://github.com/vincent178/flexrouter) [ 6 stars ]
+用 Typescript 实现的基于前缀树前后端通用的路由框架
+  YAWL (https://github.com/vincent178/yawl)
+用 Typescript 实现的 websocket 后端库
+  DNS (https://github.com/vincent178/DNS)
+用 Swift 实现的发送 DNS 请求到任意 DNS 服务器
+  给以下项目贡献过代码
+ https://github.com/kubernetes/kubernetes [ 67k stars ] https://github.com/pingcap/chaos-mesh [ 1.8k stars ] https://github.com/pingcap/tidb-operator [ 613 stars ] https://github.com/vektra/mockery [ 1.</description>
+    </item>
+    
+  </channel>
+</rss>

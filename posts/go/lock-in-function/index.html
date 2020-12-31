@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  
+    <title>高效用锁之巧用立即执行函数 :: Keep Curiosity — 保持好奇心</title>
+  
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<meta name="description" content="锁在 go 的代码中很常见。并发编程中锁保护对共享内存的读取和改动，不会出现竞争（race condition）。
+type person struct { mux sync.Mutex name string // ... } func (s *person) UpdateName(name string) error { s.mux.Lock() defer s.mux.Unlock() // ...  s.name = name // ... } 高效使用锁的一个要点就是锁变量不锁过程，也就是只锁需要在并发下获取或改变的变量。
+根据这个优化一下上面的代码，移除 defer 代码，只在变量的上下调用锁。
+func (s *person) UpdateName(name string) error { // ...  s.mux.Lock() s.name = name s.mux.Unlock() // ... } 但因为移除了 defer 代码块，提高了维护成本。在复杂的代码情景下，会有可能忘了调用 Unlock 或者在 Lock 和 Unlock 中间插入了不应该由锁保护的代码导致性能下降。
+那么有没有办法保留 defer 同时只保护 name 变量呢？引入一个新的立即执行函数。" />
+<meta name="keywords" content="golang kubernetes blog 博客" />
+<meta name="robots" content="noodp" />
+<link rel="canonical" href="/posts/go/lock-in-function/" />
+
+
+<script type="application/javascript">
+var doNotTrack = false;
+if (!doNotTrack) {
+	(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+	(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+	m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+	})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+	ga('create', 'UA-167990863-1', 'auto');
+	
+	ga('send', 'pageview');
+}
+</script>
+
+
+
+<link rel="stylesheet" href="/assets/style.css">
+
+
+
+
+
+
+<link rel="apple-touch-icon-precomposed" sizes="144x144" href="/img/apple-touch-icon-144-precomposed.png">
+
+  <link rel="shortcut icon" href="/img/favicon/orange.png">
+
+
+
+<meta name="twitter:card" content="summary" />
+
+<meta name="twitter:creator" content="" />
+
+
+<meta property="og:locale" content="zh" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="高效用锁之巧用立即执行函数 :: Keep Curiosity">
+<meta property="og:description" content="锁在 go 的代码中很常见。并发编程中锁保护对共享内存的读取和改动，不会出现竞争（race condition）。
+type person struct { mux sync.Mutex name string // ... } func (s *person) UpdateName(name string) error { s.mux.Lock() defer s.mux.Unlock() // ...  s.name = name // ... } 高效使用锁的一个要点就是锁变量不锁过程，也就是只锁需要在并发下获取或改变的变量。
+根据这个优化一下上面的代码，移除 defer 代码，只在变量的上下调用锁。
+func (s *person) UpdateName(name string) error { // ...  s.mux.Lock() s.name = name s.mux.Unlock() // ... } 但因为移除了 defer 代码块，提高了维护成本。在复杂的代码情景下，会有可能忘了调用 Unlock 或者在 Lock 和 Unlock 中间插入了不应该由锁保护的代码导致性能下降。
+那么有没有办法保留 defer 同时只保护 name 变量呢？引入一个新的立即执行函数。" />
+<meta property="og:url" content="/posts/go/lock-in-function/" />
+<meta property="og:site_name" content="高效用锁之巧用立即执行函数" />
+
+  
+    <meta property="og:image" content="/img/favicon/orange.png">
+  
+
+<meta property="og:image:width" content="2048">
+<meta property="og:image:height" content="1024">
+
+
+  <meta property="article:published_time" content="2020-04-26 05:26:13 &#43;0800 &#43;0800" />
+
+
+
+
+
+
+
+
+
+
+
+
+</head>
+<body class="">
+
+
+<div class="container headings--one-size">
+
+  <header class="header">
+  <div class="header__inner">
+    <div class="header__logo">
+      <a href="/">
+  <div class="logo">
+    保持好奇心
+  </div>
+</a>
+
+    </div>
+    <div class="menu-trigger">menu</div>
+  </div>
+  
+    <nav class="menu">
+  <ul class="menu__inner menu__inner--desktop">
+    
+      
+        
+          <li><a href="/about">About</a></li>
+        
+      
+        
+          <li><a href="/archive">Archive</a></li>
+        
+      
+      
+    
+
+    
+  </ul>
+
+  <ul class="menu__inner menu__inner--mobile">
+    
+      
+        <li><a href="/about">About</a></li>
+      
+    
+      
+        <li><a href="/archive">Archive</a></li>
+      
+    
+    
+  </ul>
+</nav>
+
+  
+</header>
+
+
+  <div class="content">
+    
+<div class="post">
+  <h1 class="post-title">
+    <a href="/posts/go/lock-in-function/">高效用锁之巧用立即执行函数</a></h1>
+  <div class="post-meta">
+      
+    <span class="post-date">
+      2020-04-26
+    </span>
+    
+    
+  </div>
+
+  
+  <span class="post-tags">
+    
+    #<a href="/tags/go/">go</a>&nbsp;
+    
+  </span>
+  
+
+  
+
+  <div class="post-content"><div>
+        <p>锁在 go 的代码中很常见。并发编程中锁保护对共享内存的读取和改动，不会出现竞争（race condition）。</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">person</span> <span style="color:#66d9ef">struct</span> {
+  <span style="color:#a6e22e">mux</span>  <span style="color:#a6e22e">sync</span>.<span style="color:#a6e22e">Mutex</span>
+  <span style="color:#a6e22e">name</span> <span style="color:#66d9ef">string</span> 
+  <span style="color:#75715e">// ...
+</span><span style="color:#75715e"></span>}
+
+<span style="color:#66d9ef">func</span> (<span style="color:#a6e22e">s</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">person</span>) <span style="color:#a6e22e">UpdateName</span>(<span style="color:#a6e22e">name</span> <span style="color:#66d9ef">string</span>) <span style="color:#66d9ef">error</span> {
+  <span style="color:#a6e22e">s</span>.<span style="color:#a6e22e">mux</span>.<span style="color:#a6e22e">Lock</span>()
+  <span style="color:#66d9ef">defer</span> <span style="color:#a6e22e">s</span>.<span style="color:#a6e22e">mux</span>.<span style="color:#a6e22e">Unlock</span>()
+
+  <span style="color:#75715e">// ...
+</span><span style="color:#75715e"></span>
+  <span style="color:#a6e22e">s</span>.<span style="color:#a6e22e">name</span> = <span style="color:#a6e22e">name</span>
+
+  <span style="color:#75715e">// ...
+</span><span style="color:#75715e"></span>}
+</code></pre></div><p>高效使用锁的一个要点就是锁变量不锁过程，也就是只锁需要在并发下获取或改变的变量。</p>
+<p>根据这个优化一下上面的代码，移除 <code>defer</code> 代码，只在变量的上下调用锁。</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#66d9ef">func</span> (<span style="color:#a6e22e">s</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">person</span>) <span style="color:#a6e22e">UpdateName</span>(<span style="color:#a6e22e">name</span> <span style="color:#66d9ef">string</span>) <span style="color:#66d9ef">error</span> {
+  <span style="color:#75715e">// ...
+</span><span style="color:#75715e"></span>
+  <span style="color:#a6e22e">s</span>.<span style="color:#a6e22e">mux</span>.<span style="color:#a6e22e">Lock</span>()
+  <span style="color:#a6e22e">s</span>.<span style="color:#a6e22e">name</span> = <span style="color:#a6e22e">name</span>
+  <span style="color:#a6e22e">s</span>.<span style="color:#a6e22e">mux</span>.<span style="color:#a6e22e">Unlock</span>()
+
+  <span style="color:#75715e">// ...
+</span><span style="color:#75715e"></span>}
+</code></pre></div><p>但因为移除了 <code>defer</code> 代码块，提高了维护成本。在复杂的代码情景下，会有可能忘了调用 <code>Unlock</code> 或者在 <code>Lock</code> 和 <code>Unlock</code> 中间插入了不应该由锁保护的代码导致性能下降。</p>
+<p>那么有没有办法保留 <code>defer</code> 同时只保护 <code>name</code> 变量呢？引入一个新的立即执行函数。</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#66d9ef">func</span> (<span style="color:#a6e22e">s</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">person</span>) <span style="color:#a6e22e">UpdateName</span>(<span style="color:#a6e22e">name</span> <span style="color:#66d9ef">string</span>) <span style="color:#66d9ef">error</span> {
+  <span style="color:#75715e">// ...
+</span><span style="color:#75715e"></span>
+  <span style="color:#66d9ef">func</span>() {
+    <span style="color:#a6e22e">s</span>.<span style="color:#a6e22e">mux</span>.<span style="color:#a6e22e">Lock</span>()
+    <span style="color:#66d9ef">defer</span> <span style="color:#a6e22e">s</span>.<span style="color:#a6e22e">mux</span>.<span style="color:#a6e22e">Unlock</span>()
+
+    <span style="color:#a6e22e">s</span>.<span style="color:#a6e22e">name</span> = <span style="color:#a6e22e">name</span>
+  }()
+
+  <span style="color:#75715e">// ...
+</span><span style="color:#75715e"></span>}
+</code></pre></div>
+      </div></div>
+
+  
+  
+<div class="pagination">
+    <div class="pagination__title">
+        <span class="pagination__title-h">其他博客</span>
+        <hr />
+    </div>
+    <div class="pagination__buttons">
+        
+        <span class="button previous">
+            <a href="/posts/go/unsafe/">
+                <span class="button__icon">←</span>
+                <span class="button__text">浅谈 Go 语言的 unsafe 包</span>
+            </a>
+        </span>
+        
+        
+        <span class="button next">
+            <a href="/posts/database/pg_bloat/">
+                <span class="button__text">深入浅出 PG 数据膨胀</span>
+                <span class="button__icon">→</span>
+            </a>
+        </span>
+        
+    </div>
+</div>
+
+  
+
+  
+
+</div>
+
+  </div>
+
+  
+    <footer class="footer">
+  <div class="footer__inner">
+    
+      <div class="copyright">
+        <span>© 2020 Powered by <a href="http://gohugo.io">Hugo</a></span>
+    
+        <span>:: Theme made by <a href="https://twitter.com/panr">panr</a></span>
+      </div>
+  </div>
+</footer>
+
+<script src="/assets/main.js"></script>
+<script src="/assets/prism.js"></script>
+
+
+
+
+
+  
+</div>
+
+</body>
+</html>
