@@ -32,13 +32,16 @@ jobs:
         with:
           ruby-version: '3.3'
           bundler-cache: true
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-      - name: Build with Jekyll
-        uses: actions/jekyll-build-pages@v1
-        with:
-          source: ./
-          destination: ./_site
+      - name: Build page 
+        run: |
+          bundle exec jekyll build
+      # - name: Setup Pages
+      #   uses: actions/configure-pages@v4
+      # - name: Build with Jekyll
+      #   uses: actions/jekyll-build-pages@v1
+      #   with:
+      #     source: ./
+      #     destination: ./_site
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
 
