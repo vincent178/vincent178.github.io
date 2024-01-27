@@ -9,7 +9,7 @@ gem 'kramdown-parser-gfm'
 gem 'webrick'
 
 group :jekyll_plugins do
-  # gem "github-pages"
+  gem "github-pages"
   gem "jekyll-feed", "~> 0.15"
 end
 
